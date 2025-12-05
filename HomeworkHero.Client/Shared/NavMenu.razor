@@ -1,0 +1,48 @@
+@implements IDisposable
+
+<nav class="navbar">
+    <div class="brand">Homework Hero</div>
+    <div class="links">
+        <NavLink href="/" Match="NavLinkMatch.All">Home</NavLink>
+        <NavLink href="/students">Students</NavLink>
+        <NavLink href="/homework">Homework</NavLink>
+        <NavLink href="/login">Login</NavLink>
+    </div>
+    <div class="auth-status">
+        @if (authState.IsAuthenticated)
+        {
+            <span>@authState.Email (@authState.Role)</span>
+            <button class="link" @onclick="Logout">Logout</button>
+        }
+        else
+        {
+            <span>Not signed in</span>
+        }
+    </div>
+</nav>
+<hr />
+
+@code {
+    [Inject]
+    private AuthState authState { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        authState.OnChange += Refresh;
+    }
+
+    private void Refresh()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Logout()
+    {
+        authState.Clear();
+    }
+
+    public void Dispose()
+    {
+        authState.OnChange -= Refresh;
+    }
+}

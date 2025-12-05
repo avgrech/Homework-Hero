@@ -1,0 +1,131 @@
+@page "/homework"
+@inject HttpClient Http
+
+<h1>Homework</h1>
+<p>Create teachers and assign homework to a group or specific student.</p>
+
+<h3>New teacher</h3>
+<EditForm Model="newTeacher" OnValidSubmit="CreateTeacher">
+    <DataAnnotationsValidator />
+    <div class="card">
+        <label>First name</label>
+        <InputText @bind-Value="newTeacher.FirstName" />
+
+        <label>Last name</label>
+        <InputText @bind-Value="newTeacher.LastName" />
+
+        <label>Email</label>
+        <InputText @bind-Value="newTeacher.Email" />
+
+        <label>Details</label>
+        <InputTextArea @bind-Value="newTeacher.Details" />
+
+        <button type="submit">Save teacher</button>
+    </div>
+</EditForm>
+
+<h3>Create homework</h3>
+<EditForm Model="newHomework" OnValidSubmit="CreateHomework">
+    <DataAnnotationsValidator />
+    <div class="card">
+        <label>Title</label>
+        <InputText @bind-Value="newHomework.Title" />
+
+        <label>Text content</label>
+        <InputTextArea @bind-Value="newHomework.TextContent" />
+
+        <label>Image URL</label>
+        <InputText @bind-Value="newHomework.ImageUrl" />
+
+        <label>Teacher</label>
+        <InputSelect @bind-Value="newHomework.TeacherId">
+            <option value="">Select a teacher</option>
+            @foreach (var teacher in teachers)
+            {
+                <option value="@teacher.Id">@teacher.FirstName @teacher.LastName</option>
+            }
+        </InputSelect>
+
+        <label>Group (optional)</label>
+        <InputText @bind-Value="newHomework.AssignedGroupId" />
+
+        <label>Student Id (optional)</label>
+        <InputNumber @bind-Value="newHomework.AssignedStudentId" />
+
+        <button type="submit">Save homework</button>
+    </div>
+</EditForm>
+
+@if (!homeworkItems.Any())
+{
+    <p>No homework yet.</p>
+}
+else
+{
+    @foreach (var hw in homeworkItems)
+    {
+        <div class="card">
+            <h3>@hw.Title</h3>
+            <p><strong>Teacher Id:</strong> @hw.TeacherId</p>
+            <p><strong>Group:</strong> @hw.AssignedGroupId</p>
+            <p><strong>Student:</strong> @hw.AssignedStudentId</p>
+            <p>@hw.TextContent</p>
+            @if (!string.IsNullOrWhiteSpace(hw.ImageUrl))
+            {
+                <p><a href="@hw.ImageUrl" target="_blank">View image</a></p>
+            }
+        </div>
+    }
+}
+
+@code {
+    private List<Teacher> teachers = new();
+    private List<HomeworkItem> homeworkItems = new();
+
+    private Teacher newTeacher = new();
+    private HomeworkItem newHomework = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeachers();
+        await LoadHomework();
+    }
+
+    private async Task LoadTeachers()
+    {
+        teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
+    }
+
+    private async Task LoadHomework()
+    {
+        homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>("api/homework") ?? new();
+    }
+
+    private async Task CreateTeacher()
+    {
+        var response = await Http.PostAsJsonAsync("api/teachers", newTeacher);
+        if (response.IsSuccessStatusCode)
+        {
+            var created = await response.Content.ReadFromJsonAsync<Teacher>();
+            if (created is not null)
+            {
+                teachers.Add(created);
+                newTeacher = new();
+            }
+        }
+    }
+
+    private async Task CreateHomework()
+    {
+        var response = await Http.PostAsJsonAsync("api/homework", newHomework);
+        if (response.IsSuccessStatusCode)
+        {
+            var created = await response.Content.ReadFromJsonAsync<HomeworkItem>();
+            if (created is not null)
+            {
+                homeworkItems.Add(created);
+                newHomework = new();
+            }
+        }
+    }
+}
