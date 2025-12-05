@@ -21,6 +21,7 @@ public class HomeworkHeroContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -92,5 +93,23 @@ public class HomeworkHeroContext : DbContext
             .HasOne(up => up.Permission)
             .WithMany(p => p.UserPermissions)
             .HasForeignKey(up => up.PermissionId);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.Teacher)
+            .WithMany()
+            .HasForeignKey(n => n.TeacherId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.Student)
+            .WithMany()
+            .HasForeignKey(n => n.StudentId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.HomeworkItem)
+            .WithMany()
+            .HasForeignKey(n => n.HomeworkItemId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
