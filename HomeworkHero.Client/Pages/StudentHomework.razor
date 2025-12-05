@@ -1,0 +1,169 @@
+@page "/student-homework"
+@inject HttpClient Http
+
+<h1>Pending homework</h1>
+<p>See everything that's due and jump straight into completing the task.</p>
+
+<div class="card homework-filters">
+    <div class="filter-field">
+        <label>Teacher</label>
+        <InputText @bind-Value="teacherFilter" placeholder="Search by teacher name" />
+    </div>
+    <div class="filter-field">
+        <label>Date given</label>
+        <InputDate TValue="DateOnly?" @bind-Value="assignedFilter" />
+    </div>
+    <div class="filter-field">
+        <label>Due date</label>
+        <InputDate TValue="DateOnly?" @bind-Value="dueFilter" />
+    </div>
+    <div class="filter-field actions">
+        <button type="button" @onclick="ResetFilters">Reset filters</button>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <p>Loading homework...</p>
+}
+else if (!FilteredHomework.Any())
+{
+    <p>No homework matches your filters.</p>
+}
+else
+{
+    <div class="homework-grid">
+        @foreach (var hw in FilteredHomework)
+        {
+            <div class="card homework-card @GetStatusClass(hw)">
+                <div class="homework-card__header">
+                    <h3>@hw.Title</h3>
+                    <span class="status-chip">@GetStatusLabel(hw)</span>
+                </div>
+                <p class="muted">Teacher: @TeacherName(hw)</p>
+                <p class="muted">Date given: @hw.DateAssigned</p>
+                <p class="muted">Due date: @hw.DueDate</p>
+                <p class="homework-snippet">@hw.TextContent</p>
+                <div class="homework-actions">
+                    <button type="button" class="secondary" @onclick="() => SelectHomework(hw)">View</button>
+                    <a class="primary" href="@($"/homework-workspace/{hw.Id}")" target="_blank">Do homework</a>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@if (selectedHomework is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseModal">
+        <div class="modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>@selectedHomework.Title</h3>
+                <button class="link" @onclick="CloseModal">Close</button>
+            </div>
+            <p><strong>Teacher:</strong> @TeacherName(selectedHomework)</p>
+            <p><strong>Date given:</strong> @selectedHomework.DateAssigned</p>
+            <p><strong>Due date:</strong> @selectedHomework.DueDate</p>
+            <p><strong>Group:</strong> @selectedHomework.AssignedGroupId</p>
+            <p><strong>Student:</strong> @selectedHomework.AssignedStudentId</p>
+            @if (!string.IsNullOrWhiteSpace(selectedHomework.TextContent))
+            {
+                <p>@selectedHomework.TextContent</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(selectedHomework.ImageUrl))
+            {
+                <p><a href="@selectedHomework.ImageUrl" target="_blank">View attached image</a></p>
+            }
+            <div class="modal-actions">
+                <a class="primary" href="@($"/homework-workspace/{selectedHomework.Id}")" target="_blank">Do homework</a>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<HomeworkItem> homeworkItems = new();
+    private List<Teacher> teachers = new();
+    private bool isLoading = true;
+
+    private string teacherFilter = string.Empty;
+    private DateOnly? assignedFilter;
+    private DateOnly? dueFilter;
+
+    private HomeworkItem? selectedHomework;
+
+    private IEnumerable<HomeworkItem> FilteredHomework => homeworkItems
+        .Where(hw => string.IsNullOrWhiteSpace(teacherFilter) || TeacherName(hw).Contains(teacherFilter, StringComparison.OrdinalIgnoreCase))
+        .Where(hw => !assignedFilter.HasValue || hw.DateAssigned == assignedFilter.Value)
+        .Where(hw => !dueFilter.HasValue || hw.DueDate == dueFilter.Value)
+        .OrderBy(hw => hw.DueDate);
+
+    protected override async Task OnInitializedAsync()
+    {
+        homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>("api/homework") ?? new();
+        teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
+        isLoading = false;
+    }
+
+    private string GetStatusClass(HomeworkItem hw)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (hw.DueDate < today)
+        {
+            return "status-overdue";
+        }
+
+        if (hw.DueDate <= today.AddDays(1))
+        {
+            return "status-soon";
+        }
+
+        return "status-upcoming";
+    }
+
+    private string GetStatusLabel(HomeworkItem hw)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (hw.DueDate < today)
+        {
+            return "Overdue";
+        }
+
+        if (hw.DueDate == today)
+        {
+            return "Due today";
+        }
+
+        if (hw.DueDate == today.AddDays(1))
+        {
+            return "Due tomorrow";
+        }
+
+        return $"Due in {(hw.DueDate.ToDateTime(TimeOnly.MinValue) - today.ToDateTime(TimeOnly.MinValue)).Days} days";
+    }
+
+    private string TeacherName(HomeworkItem hw)
+    {
+        var teacher = teachers.FirstOrDefault(t => t.Id == hw.TeacherId);
+        return teacher is null
+            ? $"Teacher #{hw.TeacherId}"
+            : $"{teacher.FirstName} {teacher.LastName}";
+    }
+
+    private void ResetFilters()
+    {
+        teacherFilter = string.Empty;
+        assignedFilter = null;
+        dueFilter = null;
+    }
+
+    private void SelectHomework(HomeworkItem hw)
+    {
+        selectedHomework = hw;
+    }
+
+    private void CloseModal()
+    {
+        selectedHomework = null;
+    }
+}

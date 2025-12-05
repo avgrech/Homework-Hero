@@ -26,60 +26,42 @@
 </EditForm>
 
 <h3>Create homework</h3>
-@if (!Auth.IsAuthenticated)
-{
-    <p class="text-error">You must be signed in to create homework.</p>
-}
-else if (!string.Equals(Auth.Role, "Teacher", StringComparison.OrdinalIgnoreCase))
-{
-    <p class="text-error">Only teachers can create homework.</p>
-}
-else
-{
-    <EditForm Model="newHomework" OnValidSubmit="CreateHomework">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
-        <div class="card">
-            <label>Title</label>
-            <InputText @bind-Value="newHomework.Title" />
+<EditForm Model="newHomework" OnValidSubmit="CreateHomework">
+    <DataAnnotationsValidator />
+    <div class="card">
+        <label>Title</label>
+        <InputText @bind-Value="newHomework.Title" />
 
-            <label>Subject</label>
-            <InputSelect @bind-Value="newHomework.Subject">
-                <option value="">Select a subject</option>
-                @foreach (var subject in subjects)
-                {
-                    <option value="@subject">@subject</option>
-                }
-            </InputSelect>
+        <label>Text content</label>
+        <InputTextArea @bind-Value="newHomework.TextContent" />
 
-            <label>Due date</label>
-            <InputDate @bind-Value="newHomework.DueDate" />
+        <label>Image URL</label>
+        <InputText @bind-Value="newHomework.ImageUrl" />
 
-            <label>Text content</label>
-            <InputTextArea @bind-Value="newHomework.TextContent" />
+        <label>Date given</label>
+        <InputDate TValue="DateOnly" @bind-Value="newHomework.DateAssigned" />
 
-            <label>Image URL (optional)</label>
-            <InputText @bind-Value="newHomework.ImageUrl" />
+        <label>Due date</label>
+        <InputDate TValue="DateOnly" @bind-Value="newHomework.DueDate" />
 
-            <label>Teacher</label>
-            <InputSelect @bind-Value="newHomework.TeacherId">
-                <option value="">Select a teacher</option>
-                @foreach (var teacher in teachers)
-                {
-                    <option value="@teacher.Id">@teacher.FirstName @teacher.LastName</option>
-                }
-            </InputSelect>
+        <label>Teacher</label>
+        <InputSelect @bind-Value="newHomework.TeacherId">
+            <option value="">Select a teacher</option>
+            @foreach (var teacher in teachers)
+            {
+                <option value="@teacher.Id">@teacher.FirstName @teacher.LastName</option>
+            }
+        </InputSelect>
 
-            <label>Group (optional)</label>
-            <InputText @bind-Value="newHomework.AssignedGroupId" />
+        <label>Group (optional)</label>
+        <InputText @bind-Value="newHomework.AssignedGroupId" />
 
-            <label>Student Id (optional)</label>
-            <InputNumber @bind-Value="newHomework.AssignedStudentId" />
+        <label>Student Id (optional)</label>
+        <InputNumber @bind-Value="newHomework.AssignedStudentId" />
 
-            <button type="submit">Save homework</button>
-        </div>
-    </EditForm>
-}
+        <button type="submit">Save homework</button>
+    </div>
+</EditForm>
 
 @if (!homeworkItems.Any())
 {
@@ -96,6 +78,8 @@ else
             <p><strong>Teacher Id:</strong> @hw.TeacherId</p>
             <p><strong>Group:</strong> @hw.AssignedGroupId</p>
             <p><strong>Student:</strong> @hw.AssignedStudentId</p>
+            <p><strong>Date given:</strong> @hw.DateAssigned</p>
+            <p><strong>Due date:</strong> @hw.DueDate</p>
             <p>@hw.TextContent</p>
             @if (!string.IsNullOrWhiteSpace(hw.ImageUrl))
             {
@@ -111,7 +95,11 @@ else
     private List<string> subjects = new() { "Math", "Science", "History", "Language Arts", "Social Studies", "Art", "Music", "PE", "Other" };
 
     private Teacher newTeacher = new();
-    private HomeworkItem newHomework = new() { DueDate = DateOnly.FromDateTime(DateTime.Today) };
+    private HomeworkItem newHomework = new()
+    {
+        DateAssigned = DateOnly.FromDateTime(DateTime.UtcNow),
+        DueDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7)
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -152,7 +140,11 @@ else
             if (created is not null)
             {
                 homeworkItems.Add(created);
-                newHomework = new() { DueDate = DateOnly.FromDateTime(DateTime.Today) };
+                newHomework = new()
+                {
+                    DateAssigned = DateOnly.FromDateTime(DateTime.UtcNow),
+                    DueDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7)
+                };
             }
         }
     }

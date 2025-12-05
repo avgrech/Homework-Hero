@@ -113,6 +113,11 @@ conditions.MapPost("/", async (Condition condition, HomeworkHeroContext db) =>
 
 var homework = app.MapGroup("/api/homework");
 homework.MapGet("/", async (HomeworkHeroContext db) => await db.HomeworkItems.ToListAsync());
+homework.MapGet("/{id:int}", async (int id, HomeworkHeroContext db) =>
+    await db.HomeworkItems.FirstOrDefaultAsync(h => h.Id == id)
+        is HomeworkItem item
+            ? Results.Ok(item)
+            : Results.NotFound());
 homework.MapPost("/", async (HomeworkItem item, HomeworkHeroContext db) =>
 {
     if (string.IsNullOrWhiteSpace(item.Subject))

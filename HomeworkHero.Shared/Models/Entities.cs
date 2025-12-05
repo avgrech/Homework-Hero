@@ -107,6 +107,12 @@ public class HomeworkItem
 
     public string? ImageUrl { get; set; }
 
+    [DataType(DataType.Date)]
+    public DateOnly DateAssigned { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
+
+    [DataType(DataType.Date)]
+    public DateOnly DueDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7);
+
     public int TeacherId { get; set; }
     public Teacher? Teacher { get; set; }
 
