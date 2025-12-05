@@ -1,0 +1,79 @@
+@page "/students"
+@inject HttpClient Http
+
+<h1>Students</h1>
+<p>Add a student and see existing records.</p>
+
+<EditForm Model="newStudent" OnValidSubmit="CreateStudent">
+    <DataAnnotationsValidator />
+    <div class="card">
+        <label>First name</label>
+        <InputText @bind-Value="newStudent.FirstName" />
+
+        <label>Last name</label>
+        <InputText @bind-Value="newStudent.LastName" />
+
+        <label>Email</label>
+        <InputText @bind-Value="newStudent.Email" />
+
+        <label>Date of birth</label>
+        <InputDate @bind-Value="newStudent.DateOfBirth" />
+
+        <label>Details</label>
+        <InputTextArea @bind-Value="newStudent.Details" />
+
+        <button type="submit">Save student</button>
+    </div>
+</EditForm>
+
+@if (students is null)
+{
+    <p>Loading students...</p>
+}
+else if (!students.Any())
+{
+    <p>No students yet.</p>
+}
+else
+{
+    @foreach (var student in students)
+    {
+        <div class="card">
+            <h3>@student.FirstName @student.LastName</h3>
+            <p><strong>Email:</strong> @student.Email</p>
+            <p><strong>Date of birth:</strong> @student.DateOfBirth</p>
+            <p>@student.Details</p>
+        </div>
+    }
+}
+
+@code {
+    private List<Student>? students;
+    private Student newStudent = new()
+    {
+        DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-10))
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        students = await Http.GetFromJsonAsync<List<Student>>("api/students") ?? new();
+    }
+
+    private async Task CreateStudent()
+    {
+        var response = await Http.PostAsJsonAsync("api/students", newStudent);
+        if (response.IsSuccessStatusCode)
+        {
+            var created = await response.Content.ReadFromJsonAsync<Student>();
+            if (created is not null)
+            {
+                students ??= new();
+                students.Add(created);
+                newStudent = new()
+                {
+                    DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-10))
+                };
+            }
+        }
+    }
+}

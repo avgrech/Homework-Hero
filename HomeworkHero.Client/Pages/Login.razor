@@ -1,0 +1,79 @@
+@page "/login"
+@inject HttpClient Http
+@inject AuthState Auth
+
+<h1>Login</h1>
+<p>Sign in as a student, teacher, or admin to continue.</p>
+
+<EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <div class="card">
+        <label>Email</label>
+        <InputText @bind-Value="loginModel.Email" />
+
+        <label>Password</label>
+        <InputText @bind-Value="loginModel.Password" Type="password" />
+
+        <button type="submit">Login</button>
+    </div>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <p class="@(loginSuccess ? "text-success" : "text-error")">@message</p>
+}
+
+@if (Auth.IsAuthenticated)
+{
+    <p>Signed in as <strong>@Auth.Email</strong> with role <strong>@Auth.Role</strong>.</p>
+}
+
+@code {
+    private readonly LoginModel loginModel = new();
+    private string? message;
+    private bool loginSuccess;
+
+    private async Task HandleLogin()
+    {
+        message = null;
+        loginSuccess = false;
+
+        var response = await Http.PostAsJsonAsync("api/auth/login", new LoginRequest(loginModel.Email, loginModel.Password));
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+            if (result?.Success == true && !string.IsNullOrEmpty(result.Role))
+            {
+                Auth.SetUser(loginModel.Email, result.Role);
+                loginSuccess = true;
+                message = $"Welcome back, {loginModel.Email}! Role: {result.Role}";
+            }
+            else
+            {
+                message = result?.Message ?? "Unable to login";
+            }
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            message = "User not found";
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            message = "Invalid credentials";
+        }
+        else
+        {
+            message = "Unexpected error while logging in";
+        }
+    }
+
+    private class LoginModel
+    {
+        [Required, EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+    }
+}

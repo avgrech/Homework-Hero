@@ -1,0 +1,81 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+    background-color: #1b6ec2;
+    color: white;
+}
+
+.navbar .links a {
+    color: white;
+    margin-right: 1rem;
+    text-decoration: none;
+}
+
+.navbar .links a.active {
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+.auth-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.auth-status .link {
+    background: transparent;
+    color: white;
+    border: none;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+main {
+    flex: 1;
+}
+
+form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+label {
+    font-weight: 600;
+}
+
+input, textarea, select, button {
+    padding: 0.5rem;
+    font-size: 1rem;
+}
+
+.card {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.text-success {
+    color: #0b8043;
+}
+
+.text-error {
+    color: #c62828;
+}
