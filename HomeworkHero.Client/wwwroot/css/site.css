@@ -270,3 +270,39 @@ input, textarea, select, button {
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 1rem;
 }
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th,
+.table td {
+    padding: 0.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    text-align: left;
+}
+
+.tag {
+    display: inline-block;
+    padding: 0.15rem 0.45rem;
+    background: #e8eaed;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    margin-left: 0.5rem;
+}
+
+.status-submitted {
+    color: #0b8043;
+    font-weight: 600;
+}
+
+.status-overdue {
+    color: #d93025;
+    font-weight: 600;
+}
+
+.status-pending {
+    color: #f29900;
+    font-weight: 600;
+}

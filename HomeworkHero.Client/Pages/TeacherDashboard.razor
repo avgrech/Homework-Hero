@@ -1,0 +1,189 @@
+@page "/teacher-dashboard"
+@inject HttpClient Http
+
+<h1>Teacher dashboard</h1>
+<p>View groups, students, homework progress, chats, and emergency controls.</p>
+
+<div class="card">
+    <label>Teacher ID</label>
+    <InputNumber @bind-Value="teacherId" />
+    <button @onclick="LoadDashboard">Load dashboard</button>
+</div>
+
+@if (notifications is not null)
+{
+    <h2>Notifications</h2>
+    @if (!notifications.Any())
+    {
+        <p>No notifications yet.</p>
+    }
+    else
+    {
+        <ul>
+            @foreach (var note in notifications)
+            {
+                <li><strong>@note.CreatedAt.ToLocalTime().ToString("g"):</strong> @note.Message</li>
+            }
+        </ul>
+    }
+}
+
+@if (groups is null)
+{
+    <p>Enter a teacher id to load groups.</p>
+}
+else if (!groups.Any())
+{
+    <p>No groups found for this teacher.</p>
+}
+else
+{
+    <h2>Groups</h2>
+    @foreach (var group in groups)
+    {
+        <div class="card">
+            <h3>Group: @group.GroupId</h3>
+            @if (group.Students.Count == 0)
+            {
+                <p>No students in this group yet.</p>
+            }
+            else
+            {
+                <ul>
+                    @foreach (var student in group.Students)
+                    {
+                        <li>
+                            <button class="link" @onclick="() => SelectStudent(student)">@student.FirstName @student.LastName</button>
+                            @if (student.IsChatBlocked)
+                            {
+                                <span class="tag">Chat blocked</span>
+                            }
+                            <button @onclick="() => ToggleChat(student)">@((student.IsChatBlocked ? "Resume chat" : "Emergency stop"))</button>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+}
+
+@if (selectedStudent is not null)
+{
+    <h2>Student overview: @selectedStudent.FirstName @selectedStudent.LastName</h2>
+    @if (studentHomework is null)
+    {
+        <p>Loading homework...</p>
+    }
+    else if (!studentHomework.Any())
+    {
+        <p>No homework assigned yet.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Subject</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var hw in studentHomework)
+                {
+                    <tr>
+                        <td>@hw.Title</td>
+                        <td>@hw.Subject</td>
+                        <td>@hw.DueDate.ToShortDateString()</td>
+                        <td class="@StatusClass(hw.Status)">@hw.Status</td>
+                        <td><button @onclick="() => ViewHomeworkDetail(hw.HomeworkId)">View details</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@if (homeworkDetail is not null)
+{
+    <div class="card">
+        <h3>@homeworkDetail.Title (@homeworkDetail.Status)</h3>
+        <p><strong>Subject:</strong> @homeworkDetail.Subject</p>
+        <p><strong>Due:</strong> @homeworkDetail.DueDate.ToShortDateString()</p>
+        <p><strong>Question:</strong> @homeworkDetail.QuestionText</p>
+        <p><strong>Student answer:</strong> @homeworkDetail.StudentAnswer</p>
+
+        <h4>Chat transcript</h4>
+        @if (homeworkDetail.Prompts.Any())
+        {
+            <ul>
+                @foreach (var prompt in homeworkDetail.Prompts)
+                {
+                    <li>
+                        <strong>@prompt.CreatedAt.ToLocalTime().ToString("g")</strong><br />
+                        <em>Prompt:</em> @prompt.PromptText<br />
+                        <em>AI response:</em> @prompt.ResponseText
+                    </li>
+                }
+            </ul>
+        }
+        else
+        {
+            <p>No chat prompts recorded.</p>
+        }
+    </div>
+}
+
+@code {
+    private int teacherId = 1;
+    private List<GroupSummaryDto>? groups;
+    private List<NotificationDto>? notifications;
+    private StudentSummaryDto? selectedStudent;
+    private List<StudentHomeworkSummaryDto>? studentHomework;
+    private StudentHomeworkDetailDto? homeworkDetail;
+
+    private async Task LoadDashboard()
+    {
+        groups = await Http.GetFromJsonAsync<List<GroupSummaryDto>>($"api/teachers/{teacherId}/groups") ?? new();
+        notifications = await Http.GetFromJsonAsync<List<NotificationDto>>($"api/teachers/{teacherId}/notifications") ?? new();
+        selectedStudent = null;
+        studentHomework = null;
+        homeworkDetail = null;
+    }
+
+    private async Task SelectStudent(StudentSummaryDto student)
+    {
+        selectedStudent = student;
+        homeworkDetail = null;
+        studentHomework = await Http.GetFromJsonAsync<List<StudentHomeworkSummaryDto>>($"api/teachers/{teacherId}/students/{student.Id}/homework") ?? new();
+    }
+
+    private async Task ViewHomeworkDetail(int homeworkId)
+    {
+        if (selectedStudent is null)
+        {
+            return;
+        }
+
+        homeworkDetail = await Http.GetFromJsonAsync<StudentHomeworkDetailDto>($"api/homework/{homeworkId}/details/{selectedStudent.Id}");
+    }
+
+    private async Task ToggleChat(StudentSummaryDto student)
+    {
+        var request = new FlagStudentRequest(!student.IsChatBlocked, "Emergency chat toggle");
+        var response = await Http.PostAsJsonAsync($"api/students/{student.Id}/flag", request);
+        if (response.IsSuccessStatusCode)
+        {
+            student.IsChatBlocked = !student.IsChatBlocked;
+        }
+    }
+
+    private string StatusClass(string status) => status switch
+    {
+        "submitted" => "status-submitted",
+        "overdue" => "status-overdue",
+        _ => "status-pending"
+    };
+}

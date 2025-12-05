@@ -21,6 +21,8 @@ public class Student
     [MaxLength(1000)]
     public string Details { get; set; } = string.Empty;
 
+    public bool IsChatBlocked { get; set; }
+
     public ICollection<StudentCondition> Conditions { get; set; } = new List<StudentCondition>();
     public ICollection<StudentTeacher> Enrollments { get; set; } = new List<StudentTeacher>();
     public ICollection<StudentAction> Actions { get; set; } = new List<StudentAction>();
@@ -98,10 +100,6 @@ public class HomeworkItem
     [Required, MaxLength(100)]
     public string Subject { get; set; } = string.Empty;
 
-    [Required]
-    [DataType(DataType.Date)]
-    public DateOnly DueDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
-
     [MaxLength(4000)]
     public string? TextContent { get; set; }
 
@@ -158,6 +156,9 @@ public class StudentPrompt
 
     [Required, MaxLength(2000)]
     public string PromptText { get; set; } = string.Empty;
+
+    [MaxLength(4000)]
+    public string? ResponseText { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
@@ -236,3 +237,22 @@ public class UserPermission
 public record LoginRequest(string Email, string Password);
 
 public record LoginResponse(bool Success, string? Role, string? Message = null);
+
+public class Notification
+{
+    public int Id { get; set; }
+    public int TeacherId { get; set; }
+    public Teacher? Teacher { get; set; }
+
+    public int? StudentId { get; set; }
+    public Student? Student { get; set; }
+
+    public int? HomeworkItemId { get; set; }
+    public HomeworkItem? HomeworkItem { get; set; }
+
+    [Required, MaxLength(500)]
+    public string Message { get; set; } = string.Empty;
+
+    public bool IsRead { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

@@ -93,6 +93,37 @@ students.MapPost("/{id:int}/teachers", async (int id, StudentTeacher enrollment,
     return Results.Created($"/api/students/{id}/teachers/{enrollment.TeacherId}", enrollment);
 });
 
+students.MapPost("/{id:int}/flag", async (int id, FlagStudentRequest request, HomeworkHeroContext db) =>
+{
+    var student = await db.Students.FindAsync(id);
+    if (student is null)
+    {
+        return Results.NotFound();
+    }
+
+    student.IsChatBlocked = request.IsChatBlocked;
+    await db.SaveChangesAsync();
+    return Results.Ok(student);
+});
+
+students.MapGet("/{id:int}/prompts", async (int id, int? homeworkId, HomeworkHeroContext db) =>
+{
+    var promptsQuery = db.StudentPrompts
+        .Where(p => p.StudentId == id);
+
+    if (homeworkId.HasValue)
+    {
+        promptsQuery = promptsQuery.Where(p => p.HomeworkItemId == homeworkId);
+    }
+
+    var prompts = await promptsQuery
+        .OrderByDescending(p => p.CreatedAt)
+        .Select(p => new StudentPromptDto(p.Id, p.PromptText, p.ResponseText, p.CreatedAt))
+        .ToListAsync();
+
+    return prompts;
+});
+
 var teachers = app.MapGroup("/api/teachers");
 teachers.MapGet("/", async (HomeworkHeroContext db) => await db.Teachers.ToListAsync());
 teachers.MapPost("/", async (Teacher teacher, HomeworkHeroContext db) =>
@@ -100,6 +131,73 @@ teachers.MapPost("/", async (Teacher teacher, HomeworkHeroContext db) =>
     db.Teachers.Add(teacher);
     await db.SaveChangesAsync();
     return Results.Created($"/api/teachers/{teacher.Id}", teacher);
+});
+
+teachers.MapGet("/{id:int}/groups", async (int id, HomeworkHeroContext db) =>
+{
+    var groups = await db.StudentTeachers
+        .Include(st => st.Student)
+        .Where(st => st.TeacherId == id)
+        .GroupBy(st => st.GroupId)
+        .Select(g => new GroupSummaryDto(
+            g.Key,
+            g.Where(st => st.Student != null)
+             .Select(st => new StudentSummaryDto
+             {
+                 Id = st.StudentId,
+                 FirstName = st.Student!.FirstName,
+                 LastName = st.Student.LastName,
+                 IsChatBlocked = st.Student.IsChatBlocked
+             })
+             .ToList()))
+        .ToListAsync();
+
+    return groups;
+});
+
+teachers.MapGet("/{teacherId:int}/students/{studentId:int}/homework", async (int teacherId, int studentId, HomeworkHeroContext db) =>
+{
+    var groupIds = await db.StudentTeachers
+        .Where(st => st.StudentId == studentId && st.TeacherId == teacherId)
+        .Select(st => st.GroupId)
+        .Distinct()
+        .ToListAsync();
+
+    var summaries = await db.HomeworkItems
+        .Where(h => h.TeacherId == teacherId &&
+            (h.AssignedStudentId == studentId || (h.AssignedGroupId != null && groupIds.Contains(h.AssignedGroupId))))
+        .Select(h => new
+        {
+            Homework = h,
+            Result = h.Results.FirstOrDefault(r => r.StudentId == studentId)
+        })
+        .AsNoTracking()
+        .ToListAsync();
+
+    var now = DateOnly.FromDateTime(DateTime.UtcNow);
+    var response = summaries
+        .Select(h => new StudentHomeworkSummaryDto(
+            h.Homework.Id,
+            h.Homework.Title,
+            h.Homework.Subject,
+            h.Homework.DueDate,
+            h.Result != null ? "submitted" : h.Homework.DueDate < now ? "overdue" : "pending",
+            h.Result?.SubmittedAt))
+        .OrderBy(h => h.DueDate)
+        .ToList();
+
+    return response;
+});
+
+teachers.MapGet("/{teacherId:int}/notifications", async (int teacherId, HomeworkHeroContext db) =>
+{
+    var notifications = await db.Notifications
+        .Where(n => n.TeacherId == teacherId)
+        .OrderByDescending(n => n.CreatedAt)
+        .Select(n => new NotificationDto(n.Id, n.Message, n.CreatedAt, n.IsRead, n.StudentId, n.HomeworkItemId))
+        .ToListAsync();
+
+    return notifications;
 });
 
 var conditions = app.MapGroup("/api/conditions");
@@ -118,6 +216,39 @@ homework.MapGet("/{id:int}", async (int id, HomeworkHeroContext db) =>
         is HomeworkItem item
             ? Results.Ok(item)
             : Results.NotFound());
+homework.MapGet("/{id:int}/details/{studentId:int}", async (int id, int studentId, HomeworkHeroContext db) =>
+{
+    var item = await db.HomeworkItems
+        .Include(h => h.Prompts.Where(p => p.StudentId == studentId))
+        .Include(h => h.Results.Where(r => r.StudentId == studentId))
+        .FirstOrDefaultAsync(h => h.Id == id);
+
+    if (item is null)
+    {
+        return Results.NotFound();
+    }
+
+    var result = item.Results.FirstOrDefault(r => r.StudentId == studentId);
+    var now = DateOnly.FromDateTime(DateTime.UtcNow);
+    var status = result != null ? "submitted" : item.DueDate < now ? "overdue" : "pending";
+
+    var detail = new StudentHomeworkDetailDto(
+        item.Id,
+        item.Title,
+        item.Subject,
+        item.DueDate,
+        status,
+        item.TextContent,
+        result?.ResultText,
+        result?.SubmittedAt,
+        item.Prompts
+            .Where(p => p.StudentId == studentId)
+            .OrderByDescending(p => p.CreatedAt)
+            .Select(p => new StudentPromptDto(p.Id, p.PromptText, p.ResponseText, p.CreatedAt))
+            .ToList());
+
+    return Results.Ok(detail);
+});
 homework.MapPost("/", async (HomeworkItem item, HomeworkHeroContext db) =>
 {
     if (string.IsNullOrWhiteSpace(item.Subject))
@@ -178,6 +309,17 @@ homework.MapPost("/{id:int}/results", async (int id, HomeworkResult result, Home
 
     result.HomeworkItemId = id;
     db.HomeworkResults.Add(result);
+    var homeworkItem = await db.HomeworkItems.FirstOrDefaultAsync(h => h.Id == id);
+    if (homeworkItem is not null)
+    {
+        db.Notifications.Add(new Notification
+        {
+            TeacherId = homeworkItem.TeacherId,
+            StudentId = result.StudentId,
+            HomeworkItemId = homeworkItem.Id,
+            Message = $"Homework '{homeworkItem.Title}' submitted by student {result.StudentId}"
+        });
+    }
     await db.SaveChangesAsync();
     return Results.Created($"/api/homework/{id}/results/{result.Id}", result);
 });
