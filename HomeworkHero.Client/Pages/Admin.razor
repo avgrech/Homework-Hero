@@ -1,0 +1,253 @@
+@page "/admin"
+@inject HttpClient Http
+@inject AuthState Auth
+
+<h1>Admin console</h1>
+<p>Manage users, classes, and emergency controls. Admins can see all data.</p>
+
+@if (!IsAdmin)
+{
+    <p class="text-error">You must be signed in as an admin to use this page.</p>
+    <NavLink href="/login">Go to login</NavLink>
+}
+else
+{
+    <section class="card">
+        <h2>Bulk import</h2>
+        <p>Download the CSV template, fill in teachers and students, then upload to create records and enrolments.</p>
+        <div class="buttons">
+            <a class="button" href="templates/bulk-import-template.csv" download>Download template</a>
+            <a class="button" href="api/admin/bulk-template">Download sample from API</a>
+        </div>
+        <InputFile OnChange="OnFileSelected" accept=".csv" />
+        <button @onclick="UploadCsv" disabled="@(uploadFile is null)">Upload CSV</button>
+
+        @if (importResult is not null)
+        {
+            <div class="import-summary">
+                <p><strong>Teachers created:</strong> @importResult.TeachersCreated</p>
+                <p><strong>Students created:</strong> @importResult.StudentsCreated</p>
+                <p><strong>Enrollments created:</strong> @importResult.EnrollmentsCreated</p>
+                @if (importResult.Errors.Any())
+                {
+                    <p class="text-error">Issues found:</p>
+                    <ul>
+                        @foreach (var error in importResult.Errors)
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="card">
+        <h2>Manual entries</h2>
+        <div class="grid">
+            <div>
+                <h3>Create student</h3>
+                <EditForm Model="newStudent" OnValidSubmit="CreateStudent">
+                    <DataAnnotationsValidator />
+                    <label>First name</label>
+                    <InputText @bind-Value="newStudent.FirstName" />
+                    <label>Last name</label>
+                    <InputText @bind-Value="newStudent.LastName" />
+                    <label>Email</label>
+                    <InputText @bind-Value="newStudent.Email" />
+                    <label>Date of birth</label>
+                    <InputDate @bind-Value="newStudent.DateOfBirth" />
+                    <label>Details</label>
+                    <InputTextArea @bind-Value="newStudent.Details" />
+                    <button type="submit">Create student</button>
+                </EditForm>
+            </div>
+            <div>
+                <h3>Create teacher</h3>
+                <EditForm Model="newTeacher" OnValidSubmit="CreateTeacher">
+                    <DataAnnotationsValidator />
+                    <label>First name</label>
+                    <InputText @bind-Value="newTeacher.FirstName" />
+                    <label>Last name</label>
+                    <InputText @bind-Value="newTeacher.LastName" />
+                    <label>Email</label>
+                    <InputText @bind-Value="newTeacher.Email" />
+                    <label>Details</label>
+                    <InputTextArea @bind-Value="newTeacher.Details" />
+                    <button type="submit">Create teacher</button>
+                </EditForm>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Assign student to group</h2>
+        <EditForm Model="enrollment" OnValidSubmit="CreateEnrollment">
+            <DataAnnotationsValidator />
+            <div class="grid">
+                <div>
+                    <label>Student ID</label>
+                    <InputNumber @bind-Value="enrollment.StudentId" />
+                </div>
+                <div>
+                    <label>Teacher ID</label>
+                    <InputNumber @bind-Value="enrollment.TeacherId" />
+                </div>
+                <div>
+                    <label>Group ID</label>
+                    <InputText @bind-Value="enrollment.GroupId" />
+                </div>
+                <div>
+                    <label>Start date</label>
+                    <InputDate @bind-Value="enrollment.StartDate" />
+                </div>
+            </div>
+            <button type="submit">Link student</button>
+        </EditForm>
+    </section>
+
+    <section class="card">
+        <h2>Emergency stop</h2>
+        <p>Block or resume chat access for everyone or specific students.</p>
+        <div class="buttons">
+            <button @onclick="() => ToggleAllChats(true)">Emergency stop all students</button>
+            <button @onclick="() => ToggleAllChats(false)">Resume all chats</button>
+        </div>
+        @if (students is null)
+        {
+            <p>Loading student list...</p>
+        }
+        else if (!students.Any())
+        {
+            <p>No students registered yet.</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Chat status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in students)
+                    {
+                        <tr>
+                            <td>@s.FirstName @s.LastName</td>
+                            <td>@s.Email</td>
+                            <td>@(s.IsChatBlocked ? "Blocked" : "Active")</td>
+                            <td><button @onclick="() => ToggleStudentChat(s)">@((s.IsChatBlocked ? "Resume" : "Emergency stop"))</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+}
+
+@code {
+    private IBrowserFile? uploadFile;
+    private BulkImportResult? importResult;
+    private List<Student>? students;
+    private Student newStudent = new()
+    {
+        DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-10))
+    };
+    private Teacher newTeacher = new();
+    private StudentTeacher enrollment = new()
+    {
+        GroupId = "Default",
+        StartDate = DateOnly.FromDateTime(DateTime.UtcNow)
+    };
+
+    private bool IsAdmin => Auth.IsAuthenticated && string.Equals(Auth.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStudents();
+    }
+
+    private async Task LoadStudents()
+    {
+        students = await Http.GetFromJsonAsync<List<Student>>("api/students") ?? new();
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        uploadFile = e.File;
+    }
+
+    private async Task UploadCsv()
+    {
+        if (uploadFile is null)
+        {
+            return;
+        }
+
+        using var content = new MultipartFormDataContent();
+        var stream = uploadFile.OpenReadStream();
+        content.Add(new StreamContent(stream), "file", uploadFile.Name);
+
+        var response = await Http.PostAsync("api/admin/bulk-import", content);
+        if (response.IsSuccessStatusCode)
+        {
+            importResult = await response.Content.ReadFromJsonAsync<BulkImportResult>();
+            await LoadStudents();
+        }
+    }
+
+    private async Task CreateStudent()
+    {
+        var response = await Http.PostAsJsonAsync("api/students", newStudent);
+        if (response.IsSuccessStatusCode)
+        {
+            var created = await response.Content.ReadFromJsonAsync<Student>();
+            if (created is not null)
+            {
+                students ??= new();
+                students.Add(created);
+                newStudent = new()
+                {
+                    DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-10))
+                };
+            }
+        }
+    }
+
+    private async Task CreateTeacher()
+    {
+        await Http.PostAsJsonAsync("api/teachers", newTeacher);
+        newTeacher = new();
+    }
+
+    private async Task CreateEnrollment()
+    {
+        await Http.PostAsJsonAsync($"api/students/{enrollment.StudentId}/teachers", enrollment);
+        await LoadStudents();
+    }
+
+    private async Task ToggleStudentChat(Student student)
+    {
+        var request = new FlagStudentRequest(!student.IsChatBlocked, "Admin emergency toggle");
+        var response = await Http.PostAsJsonAsync($"api/students/{student.Id}/flag", request);
+        if (response.IsSuccessStatusCode)
+        {
+            student.IsChatBlocked = !student.IsChatBlocked;
+        }
+    }
+
+    private async Task ToggleAllChats(bool block)
+    {
+        await Http.PostAsJsonAsync("api/students/flag-all", new FlagStudentRequest(block, "Admin global toggle"));
+        if (students is not null)
+        {
+            foreach (var student in students)
+            {
+                student.IsChatBlocked = block;
+            }
+        }
+    }
+}
