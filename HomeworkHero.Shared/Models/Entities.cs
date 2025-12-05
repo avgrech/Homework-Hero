@@ -95,6 +95,13 @@ public class HomeworkItem
     [Required, MaxLength(200)]
     public string Title { get; set; } = string.Empty;
 
+    [Required, MaxLength(100)]
+    public string Subject { get; set; } = string.Empty;
+
+    [Required]
+    [DataType(DataType.Date)]
+    public DateOnly DueDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+
     [MaxLength(4000)]
     public string? TextContent { get; set; }
 

@@ -30,6 +30,12 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<HomeworkHeroContext>();
+    db.Database.EnsureCreated();
+}
+
 app.UseHttpsRedirection();
 app.UseCors("AllowClient");
 
@@ -114,6 +120,16 @@ homework.MapGet("/{id:int}", async (int id, HomeworkHeroContext db) =>
             : Results.NotFound());
 homework.MapPost("/", async (HomeworkItem item, HomeworkHeroContext db) =>
 {
+    if (string.IsNullOrWhiteSpace(item.Subject))
+    {
+        return Results.BadRequest("Subject is required");
+    }
+
+    if (item.DueDate == default)
+    {
+        return Results.BadRequest("Due date is required");
+    }
+
     if (!await db.Teachers.AnyAsync(t => t.Id == item.TeacherId))
     {
         return Results.BadRequest("Teacher not found");
@@ -262,5 +278,3 @@ static bool VerifyPassword(string password, string hash)
 {
     return HashPassword(password) == hash;
 }
-
-app.Run();

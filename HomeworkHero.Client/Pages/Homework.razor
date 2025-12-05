@@ -1,5 +1,6 @@
 @page "/homework"
 @inject HttpClient Http
+@inject AuthState Auth
 
 <h1>Homework</h1>
 <p>Create teachers and assign homework to a group or specific student.</p>
@@ -72,6 +73,8 @@ else
     {
         <div class="card">
             <h3>@hw.Title</h3>
+            <p><strong>Subject:</strong> @hw.Subject</p>
+            <p><strong>Due:</strong> @hw.DueDate.ToString("yyyy-MM-dd")</p>
             <p><strong>Teacher Id:</strong> @hw.TeacherId</p>
             <p><strong>Group:</strong> @hw.AssignedGroupId</p>
             <p><strong>Student:</strong> @hw.AssignedStudentId</p>
@@ -89,6 +92,7 @@ else
 @code {
     private List<Teacher> teachers = new();
     private List<HomeworkItem> homeworkItems = new();
+    private List<string> subjects = new() { "Math", "Science", "History", "Language Arts", "Social Studies", "Art", "Music", "PE", "Other" };
 
     private Teacher newTeacher = new();
     private HomeworkItem newHomework = new()
