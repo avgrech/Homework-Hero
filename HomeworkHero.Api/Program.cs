@@ -3,15 +3,18 @@ using HomeworkHero.Shared.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
+using System.Globalization;
 
 public record RegisterUserRequest(
+    string Username,
     string Email,
     string Password,
     string DisplayName,
     UserRole Role,
     int? StudentId,
     int? TeacherId,
-    List<int>? PermissionIds);
+    List<int>? PermissionIds,
+    bool MustResetPassword = false);
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +37,22 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<HomeworkHeroContext>();
     db.Database.EnsureCreated();
+
+    if (!db.Users.Any(u => u.Role == UserRole.Admin))
+    {
+        var adminUser = new User
+        {
+            Username = "admin",
+            Email = "admin@example.com",
+            DisplayName = "System Administrator",
+            Role = UserRole.Admin,
+            PasswordHash = HashPassword("password"),
+            MustResetPassword = true
+        };
+
+        db.Users.Add(adminUser);
+        db.SaveChanges();
+    }
 }
 
 app.UseHttpsRedirection();
@@ -104,6 +123,22 @@ students.MapPost("/{id:int}/flag", async (int id, FlagStudentRequest request, Ho
     student.IsChatBlocked = request.IsChatBlocked;
     await db.SaveChangesAsync();
     return Results.Ok(student);
+});
+
+students.MapPost("/flag-all", async (FlagStudentRequest request, HomeworkHeroContext db) =>
+{
+    var studentsToUpdate = await db.Students.ToListAsync();
+    foreach (var student in studentsToUpdate)
+    {
+        student.IsChatBlocked = request.IsChatBlocked;
+    }
+
+    await db.SaveChangesAsync();
+    return Results.Ok(new
+    {
+        Updated = studentsToUpdate.Count,
+        request.IsChatBlocked
+    });
 });
 
 students.MapGet("/{id:int}/prompts", async (int id, int? homeworkId, HomeworkHeroContext db) =>
@@ -341,6 +376,11 @@ users.MapGet("/", async (HomeworkHeroContext db) => await db.Users
 
 users.MapPost("/", async (RegisterUserRequest request, HomeworkHeroContext db) =>
 {
+    if (await db.Users.AnyAsync(u => u.Username == request.Username))
+    {
+        return Results.Conflict("Username already registered");
+    }
+
     if (await db.Users.AnyAsync(u => u.Email == request.Email))
     {
         return Results.Conflict("Email already registered");
@@ -358,12 +398,14 @@ users.MapPost("/", async (RegisterUserRequest request, HomeworkHeroContext db) =
 
     var user = new User
     {
+        Username = request.Username,
         Email = request.Email,
         DisplayName = request.DisplayName,
         PasswordHash = HashPassword(request.Password),
         Role = request.Role,
         StudentId = request.StudentId,
-        TeacherId = request.TeacherId
+        TeacherId = request.TeacherId,
+        MustResetPassword = request.MustResetPassword
     };
 
     db.Users.Add(user);
@@ -388,10 +430,159 @@ users.MapPost("/", async (RegisterUserRequest request, HomeworkHeroContext db) =
     return Results.Created($"/api/users/{user.Id}", user);
 });
 
+var admin = app.MapGroup("/api/admin");
+
+admin.MapGet("/bulk-template", () =>
+{
+    var template = new StringBuilder();
+    template.AppendLine("type,first_name,last_name,email,date_of_birth,details,group_id,teacher_email");
+    template.AppendLine("teacher,Alice,Anderson,alice.anderson@example.com,,Math lead,");
+    template.AppendLine("student,Bob,Brown,bob.brown@example.com,2013-09-01,Needs reading support,ReadingGroupA,alice.anderson@example.com");
+    template.AppendLine("student,Casey,Clark,casey.clark@example.com,2013-02-14,,ReadingGroupA,alice.anderson@example.com");
+
+    var bytes = Encoding.UTF8.GetBytes(template.ToString());
+    return Results.File(bytes, "text/csv", "bulk-import-template.csv");
+});
+
+admin.MapPost("/bulk-import", async (HttpRequest request, HomeworkHeroContext db) =>
+{
+    if (!request.HasFormContentType)
+    {
+        return Results.BadRequest("File upload expected");
+    }
+
+    var form = await request.ReadFormAsync();
+    var file = form.Files.GetFile("file");
+    if (file is null)
+    {
+        return Results.BadRequest("CSV file is required");
+    }
+
+    using var reader = new StreamReader(file.OpenReadStream(), Encoding.UTF8);
+    var content = await reader.ReadToEndAsync();
+
+    var lines = content
+        .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .ToList();
+
+    var errors = new List<string>();
+    if (lines.Count <= 1)
+    {
+        return Results.Ok(new BulkImportResult(0, 0, 0, new List<string> { "No data rows were provided" }));
+    }
+
+    var teachersCreated = 0;
+    var studentsCreated = 0;
+    var enrollmentsCreated = 0;
+
+    for (var i = 1; i < lines.Count; i++)
+    {
+        var line = lines[i];
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            continue;
+        }
+
+        var columns = line.Split(',', StringSplitOptions.TrimEntries);
+        string GetColumn(int index) => index < columns.Length ? columns[index] : string.Empty;
+
+        var type = GetColumn(0).ToLowerInvariant();
+        var firstName = GetColumn(1);
+        var lastName = GetColumn(2);
+        var email = GetColumn(3);
+
+        if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(email))
+        {
+            errors.Add($"Row {i + 1}: type and email are required");
+            continue;
+        }
+
+        switch (type)
+        {
+            case "teacher":
+                if (!await db.Teachers.AnyAsync(t => t.Email == email))
+                {
+                    db.Teachers.Add(new Teacher
+                    {
+                        FirstName = string.IsNullOrWhiteSpace(firstName) ? "Teacher" : firstName,
+                        LastName = string.IsNullOrWhiteSpace(lastName) ? "User" : lastName,
+                        Email = email,
+                        Details = GetColumn(5)
+                    });
+                    teachersCreated++;
+                }
+                break;
+
+            case "student":
+                var teacherEmail = GetColumn(7);
+                var groupId = string.IsNullOrWhiteSpace(GetColumn(6)) ? "Ungrouped" : GetColumn(6);
+                if (string.IsNullOrWhiteSpace(teacherEmail))
+                {
+                    errors.Add($"Row {i + 1}: teacher_email is required for student rows");
+                    continue;
+                }
+
+                var teacher = await db.Teachers.FirstOrDefaultAsync(t => t.Email == teacherEmail);
+                if (teacher is null)
+                {
+                    errors.Add($"Row {i + 1}: teacher '{teacherEmail}' was not found. Add a teacher row first.");
+                    continue;
+                }
+
+                var student = await db.Students.FirstOrDefaultAsync(s => s.Email == email);
+                if (student is null)
+                {
+                    var dobText = GetColumn(4);
+                    var dob = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-10));
+                    if (!string.IsNullOrWhiteSpace(dobText) && DateOnly.TryParse(dobText, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDob))
+                    {
+                        dob = parsedDob;
+                    }
+
+                    student = new Student
+                    {
+                        FirstName = string.IsNullOrWhiteSpace(firstName) ? "Student" : firstName,
+                        LastName = string.IsNullOrWhiteSpace(lastName) ? "User" : lastName,
+                        Email = email,
+                        DateOfBirth = dob,
+                        Details = GetColumn(5)
+                    };
+
+                    db.Students.Add(student);
+                    studentsCreated++;
+                }
+
+                var existingEnrollment = await db.StudentTeachers.AnyAsync(st => st.StudentId == student.Id && st.TeacherId == teacher.Id && st.GroupId == groupId);
+                if (!existingEnrollment)
+                {
+                    db.StudentTeachers.Add(new StudentTeacher
+                    {
+                        Student = student,
+                        Teacher = teacher,
+                        GroupId = groupId,
+                        StartDate = DateOnly.FromDateTime(DateTime.UtcNow)
+                    });
+                    enrollmentsCreated++;
+                }
+
+                break;
+
+            default:
+                errors.Add($"Row {i + 1}: unsupported type '{type}'. Use 'teacher' or 'student'.");
+                break;
+        }
+    }
+
+    await db.SaveChangesAsync();
+    return Results.Ok(new BulkImportResult(teachersCreated, studentsCreated, enrollmentsCreated, errors));
+});
+
 var auth = app.MapGroup("/api/auth");
 auth.MapPost("/login", async (LoginRequest login, HomeworkHeroContext db) =>
 {
-    var user = await db.Users.FirstOrDefaultAsync(u => u.Email == login.Email);
+    var identifier = login.Identifier.ToLowerInvariant();
+    var user = await db.Users.FirstOrDefaultAsync(u =>
+        u.Username.ToLower() == identifier || u.Email.ToLower() == identifier);
     if (user is null)
     {
         return Results.NotFound(new LoginResponse(false, null, "User not found"));
@@ -402,7 +593,30 @@ auth.MapPost("/login", async (LoginRequest login, HomeworkHeroContext db) =>
         return Results.Unauthorized();
     }
 
-    return Results.Ok(new LoginResponse(true, user.Role.ToString(), "Authenticated"));
+    return Results.Ok(new LoginResponse(true, user.Role.ToString(), "Authenticated", user.MustResetPassword));
+});
+
+auth.MapPost("/reset-password", async (ResetPasswordRequest reset, HomeworkHeroContext db) =>
+{
+    var identifier = reset.Identifier.ToLowerInvariant();
+    var user = await db.Users.FirstOrDefaultAsync(u =>
+        u.Username.ToLower() == identifier || u.Email.ToLower() == identifier);
+
+    if (user is null)
+    {
+        return Results.NotFound("User not found");
+    }
+
+    if (!VerifyPassword(reset.CurrentPassword, user.PasswordHash))
+    {
+        return Results.Unauthorized();
+    }
+
+    user.PasswordHash = HashPassword(reset.NewPassword);
+    user.MustResetPassword = false;
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { Message = "Password updated" });
 });
 
 app.MapGet("/api/health", () => Results.Ok("Healthy"));

@@ -9,8 +9,8 @@
     <DataAnnotationsValidator />
     <ValidationSummary />
     <div class="card">
-        <label>Email</label>
-        <InputText @bind-Value="loginModel.Email" />
+        <label>Email or username</label>
+        <InputText @bind-Value="loginModel.Identifier" />
 
         <label>Password</label>
         <InputText @bind-Value="loginModel.Password" Type="password" />
@@ -24,6 +24,25 @@
     <p class="@(loginSuccess ? "text-success" : "text-error")">@message</p>
 }
 
+@if (requiresReset)
+{
+    <h3>Reset your password</h3>
+    <p>Enter a new password to finish signing in.</p>
+    <EditForm Model="resetModel" OnValidSubmit="ResetPassword">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="card">
+            <label>Current password</label>
+            <InputText @bind-Value="resetModel.CurrentPassword" Type="password" />
+
+            <label>New password</label>
+            <InputText @bind-Value="resetModel.NewPassword" Type="password" />
+
+            <button type="submit">Update password</button>
+        </div>
+    </EditForm>
+}
+
 @if (Auth.IsAuthenticated)
 {
     <p>Signed in as <strong>@Auth.Email</strong> with role <strong>@Auth.Role</strong>.</p>
@@ -31,23 +50,30 @@
 
 @code {
     private readonly LoginModel loginModel = new();
+    private readonly ResetPasswordModel resetModel = new();
     private string? message;
     private bool loginSuccess;
+    private bool requiresReset;
 
     private async Task HandleLogin()
     {
         message = null;
         loginSuccess = false;
 
-        var response = await Http.PostAsJsonAsync("api/auth/login", new LoginRequest(loginModel.Email, loginModel.Password));
+        var response = await Http.PostAsJsonAsync("api/auth/login", new LoginRequest(loginModel.Identifier, loginModel.Password));
         if (response.IsSuccessStatusCode)
         {
             var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
             if (result?.Success == true && !string.IsNullOrEmpty(result.Role))
             {
-                Auth.SetUser(loginModel.Email, result.Role);
+                Auth.SetUser(loginModel.Identifier, result.Role);
                 loginSuccess = true;
-                message = $"Welcome back, {loginModel.Email}! Role: {result.Role}";
+                requiresReset = result.RequiresPasswordReset;
+                message = requiresReset
+                    ? "Password reset required before continuing."
+                    : $"Welcome back, {loginModel.Identifier}! Role: {result.Role}";
+                resetModel.Identifier = loginModel.Identifier;
+                resetModel.CurrentPassword = loginModel.Password;
             }
             else
             {
@@ -70,10 +96,42 @@
 
     private class LoginModel
     {
-        [Required, EmailAddress]
-        public string Email { get; set; } = string.Empty;
+        [Required]
+        public string Identifier { get; set; } = string.Empty;
 
         [Required]
         public string Password { get; set; } = string.Empty;
+    }
+
+    private async Task ResetPassword()
+    {
+        var response = await Http.PostAsJsonAsync("api/auth/reset-password", new ResetPasswordRequest(resetModel.Identifier, resetModel.CurrentPassword, resetModel.NewPassword));
+        if (response.IsSuccessStatusCode)
+        {
+            requiresReset = false;
+            message = "Password updated. Please log in with your new password.";
+            Auth.Clear();
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            message = "Current password is incorrect.";
+        }
+        else
+        {
+            message = "Unable to reset password.";
+        }
+    }
+
+    private class ResetPasswordModel
+    {
+        [Required]
+        public string Identifier { get; set; } = string.Empty;
+
+        [Required]
+        public string CurrentPassword { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(100, MinimumLength = 6)]
+        public string NewPassword { get; set; } = string.Empty;
     }
 }

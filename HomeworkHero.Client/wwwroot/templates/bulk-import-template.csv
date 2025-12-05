@@ -1,0 +1,4 @@
+type,first_name,last_name,email,date_of_birth,details,group_id,teacher_email
+teacher,Alice,Anderson,alice.anderson@example.com,,Math lead,
+student,Bob,Brown,bob.brown@example.com,2013-09-01,Needs reading support,ReadingGroupA,alice.anderson@example.com
+student,Casey,Clark,casey.clark@example.com,2013-02-14,,ReadingGroupA,alice.anderson@example.com

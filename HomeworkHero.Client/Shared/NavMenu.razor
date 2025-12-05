@@ -8,6 +8,10 @@
         <NavLink href="/homework">Homework</NavLink>
         <NavLink href="/student-homework">Student homework</NavLink>
         <NavLink href="/teacher-dashboard">Teacher dashboard</NavLink>
+        @if (authState.IsAuthenticated && string.Equals(authState.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            <NavLink href="/admin">Admin</NavLink>
+        }
         <NavLink href="/login">Login</NavLink>
     </div>
     <div class="auth-status">

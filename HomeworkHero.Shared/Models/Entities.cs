@@ -192,11 +192,16 @@ public class User
 {
     public int Id { get; set; }
 
+    [Required, MaxLength(100)]
+    public string Username { get; set; } = string.Empty;
+
     [Required, EmailAddress]
     public string Email { get; set; } = string.Empty;
 
     [Required, MaxLength(200)]
     public string PasswordHash { get; set; } = string.Empty;
+
+    public bool MustResetPassword { get; set; }
 
     [Required, MaxLength(100)]
     public string DisplayName { get; set; } = string.Empty;
@@ -234,9 +239,13 @@ public class UserPermission
     public Permission? Permission { get; set; }
 }
 
-public record LoginRequest(string Email, string Password);
+public record LoginRequest(string Identifier, string Password);
 
-public record LoginResponse(bool Success, string? Role, string? Message = null);
+public record LoginResponse(bool Success, string? Role, string? Message = null, bool RequiresPasswordReset = false);
+
+public record ResetPasswordRequest(string Identifier, string CurrentPassword, string NewPassword);
+
+public record BulkImportResult(int TeachersCreated, int StudentsCreated, int EnrollmentsCreated, List<string> Errors);
 
 public class Notification
 {
