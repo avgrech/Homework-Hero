@@ -79,3 +79,194 @@ input, textarea, select, button {
 .text-error {
     color: #c62828;
 }
+
+.muted {
+    color: #5f6368;
+    font-size: 0.95rem;
+}
+
+.homework-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.75rem;
+    align-items: end;
+}
+
+.filter-field.actions {
+    display: flex;
+    justify-content: flex-start;
+}
+
+.homework-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+}
+
+.homework-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.homework-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.homework-snippet {
+    margin: 0.25rem 0;
+    line-height: 1.4;
+    color: #3c4043;
+}
+
+.homework-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.homework-actions .secondary,
+.homework-actions .primary {
+    text-decoration: none;
+    text-align: center;
+}
+
+.status-chip {
+    padding: 0.15rem 0.6rem;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    background: #e8eaed;
+    color: #202124;
+}
+
+.homework-card.status-overdue {
+    border-color: #d93025;
+    background: #fdecea;
+}
+
+.homework-card.status-soon {
+    border-color: #f29900;
+    background: #fff8e1;
+}
+
+.homework-card.status-upcoming {
+    border-color: #c3e6cb;
+    background: #f5fff7;
+}
+
+.homework-card.status-overdue .status-chip {
+    background: #d93025;
+    color: #fff;
+}
+
+.homework-card.status-soon .status-chip {
+    background: #f29900;
+    color: #fff;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.modal {
+    background: #fff;
+    border-radius: 8px;
+    padding: 1.25rem;
+    max-width: 520px;
+    width: 100%;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.workspace {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    align-items: start;
+}
+
+.workspace-pane {
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.pane-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.chat-window {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 0.75rem;
+    min-height: 240px;
+    max-height: 360px;
+    overflow-y: auto;
+    background: #fafafa;
+}
+
+.chat-message {
+    border-radius: 6px;
+    padding: 0.5rem 0.6rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid #e0e0e0;
+    background: #fff;
+}
+
+.chat-message.from-user {
+    border-color: #1b6ec2;
+    background: #e8f0fe;
+}
+
+.chat-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: #5f6368;
+}
+
+.chat-input {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.chat-input textarea {
+    min-height: 80px;
+}
+
+.submission-card button {
+    margin-top: 0.75rem;
+}
+
+.submission-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+}

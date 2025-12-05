@@ -37,6 +37,12 @@
         <label>Image URL</label>
         <InputText @bind-Value="newHomework.ImageUrl" />
 
+        <label>Date given</label>
+        <InputDate TValue="DateOnly" @bind-Value="newHomework.DateAssigned" />
+
+        <label>Due date</label>
+        <InputDate TValue="DateOnly" @bind-Value="newHomework.DueDate" />
+
         <label>Teacher</label>
         <InputSelect @bind-Value="newHomework.TeacherId">
             <option value="">Select a teacher</option>
@@ -69,6 +75,8 @@ else
             <p><strong>Teacher Id:</strong> @hw.TeacherId</p>
             <p><strong>Group:</strong> @hw.AssignedGroupId</p>
             <p><strong>Student:</strong> @hw.AssignedStudentId</p>
+            <p><strong>Date given:</strong> @hw.DateAssigned</p>
+            <p><strong>Due date:</strong> @hw.DueDate</p>
             <p>@hw.TextContent</p>
             @if (!string.IsNullOrWhiteSpace(hw.ImageUrl))
             {
@@ -83,7 +91,11 @@ else
     private List<HomeworkItem> homeworkItems = new();
 
     private Teacher newTeacher = new();
-    private HomeworkItem newHomework = new();
+    private HomeworkItem newHomework = new()
+    {
+        DateAssigned = DateOnly.FromDateTime(DateTime.UtcNow),
+        DueDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7)
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -124,7 +136,11 @@ else
             if (created is not null)
             {
                 homeworkItems.Add(created);
-                newHomework = new();
+                newHomework = new()
+                {
+                    DateAssigned = DateOnly.FromDateTime(DateTime.UtcNow),
+                    DueDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7)
+                };
             }
         }
     }
