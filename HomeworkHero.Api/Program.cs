@@ -1,6 +1,7 @@
 using HomeworkHero.Api.Data;
 using HomeworkHero.Shared.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using System.Security.Cryptography;
 using System.Text;
 using System.Globalization;
@@ -11,7 +12,14 @@ builder.Services.AddDbContext<HomeworkHeroContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Homework Hero API",
+        Version = "v1"
+    });
+});
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowClient", policy =>
@@ -48,7 +56,10 @@ app.UseHttpsRedirection();
 app.UseCors("AllowClient");
 
 app.UseSwagger();
-app.UseSwaggerUI();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Homework Hero API v1");
+});
 
 var students = app.MapGroup("/api/students");
 students.MapGet("/", async (HomeworkHeroContext db) => await db.Students
