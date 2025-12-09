@@ -49,18 +49,19 @@ else
             <div class="student-selector">
                 <h3>Select students</h3>
                 <p class="muted">Choose one or more students to place in the classroom.</p>
+                <InputText @bind-Value="studentSearch" placeholder="Search by name or email" oninput="oninput" />
                 <div class="student-grid">
-                    @foreach (var student in students)
+                    @foreach (var student in FilteredStudents)
                     {
                         <label>
-                            <input type="checkbox" checked="@assignment.StudentIds.Contains(student.Id)" @onchange="() => ToggleStudent(student.Id)" />
+                            <input type="checkbox" @checked="assignment.StudentIds.Contains(student.Id)" @onchange="() => ToggleStudent(student.Id)" />
                             @student.FirstName @student.LastName (@student.Email)
                         </label>
                     }
                 </div>
             </div>
 
-            <button type="submit" disabled="IsSubmitting">@((IsSubmitting ? "Saving..." : "Save classroom"))</button>
+            <button type="submit" disabled="@IsSubmitting">@((IsSubmitting ? "Saving..." : "Save classroom"))</button>
         </EditForm>
     </section>
 
@@ -104,6 +105,7 @@ else
     private List<Teacher> teachers = new();
     private List<Student> students = new();
     private List<ClassroomSummaryDto> classrooms = new();
+    private string studentSearch = string.Empty;
     private ClassroomAssignmentRequest assignment = new()
     {
         TeacherId = 0,
@@ -117,6 +119,13 @@ else
 
     private bool IsAdmin => Auth.IsAuthenticated && string.Equals(Auth.Role, "Admin", StringComparison.OrdinalIgnoreCase);
 
+    private IEnumerable<Student> FilteredStudents => string.IsNullOrWhiteSpace(studentSearch)
+        ? students
+        : students.Where(s =>
+            s.FirstName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
+            s.LastName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
+            s.Email.Contains(studentSearch, StringComparison.OrdinalIgnoreCase));
+
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
@@ -124,9 +133,15 @@ else
 
     private async Task LoadData()
     {
-        teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
-        students = await Http.GetFromJsonAsync<List<Student>>("api/students") ?? new();
-        classrooms = await Http.GetFromJsonAsync<List<ClassroomSummaryDto>>("api/admin/classrooms") ?? new();
+        var teachersTask = Http.GetFromJsonAsync<List<Teacher>>("api/teachers");
+        var studentsTask = Http.GetFromJsonAsync<List<Student>>("api/students");
+        var classroomsTask = Http.GetFromJsonAsync<List<ClassroomSummaryDto>>("api/admin/classrooms");
+
+        await Task.WhenAll(teachersTask, studentsTask, classroomsTask);
+
+        teachers = teachersTask.Result ?? new();
+        students = studentsTask.Result ?? new();
+        classrooms = classroomsTask.Result ?? new();
     }
 
     private void ToggleStudent(int studentId)
