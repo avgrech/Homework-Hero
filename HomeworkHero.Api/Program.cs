@@ -5,17 +5,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Globalization;
 
-public record RegisterUserRequest(
-    string Username,
-    string Email,
-    string Password,
-    string DisplayName,
-    UserRole Role,
-    int? StudentId,
-    int? TeacherId,
-    List<int>? PermissionIds,
-    bool MustResetPassword = false);
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<HomeworkHeroContext>(options =>
@@ -634,3 +623,14 @@ static bool VerifyPassword(string password, string hash)
 {
     return HashPassword(password) == hash;
 }
+
+public record RegisterUserRequest(
+    string Username,
+    string Email,
+    string Password,
+    string DisplayName,
+    UserRole Role,
+    int? StudentId,
+    int? TeacherId,
+    List<int>? PermissionIds,
+    bool MustResetPassword = false);
