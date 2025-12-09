@@ -2,6 +2,7 @@ using HomeworkHero.Api.Data;
 using HomeworkHero.Shared.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Globalization;
@@ -53,6 +54,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseCors("AllowClient");
 
 app.UseSwagger();
@@ -332,6 +334,30 @@ homework.MapPost("/{id:int}/prompts", async (int id, StudentPrompt prompt, Homew
     db.StudentPrompts.Add(prompt);
     await db.SaveChangesAsync();
     return Results.Created($"/api/homework/{id}/prompts/{prompt.Id}", prompt);
+});
+
+var uploads = app.MapGroup("/api/uploads");
+uploads.MapPost("/", async (IFormFile? file, IWebHostEnvironment env) =>
+{
+    if (file is null || file.Length == 0)
+    {
+        return Results.BadRequest("No file uploaded.");
+    }
+
+    var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+    var uploadDirectory = Path.Combine(webRoot, "uploads");
+    Directory.CreateDirectory(uploadDirectory);
+
+    var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+    var filePath = Path.Combine(uploadDirectory, fileName);
+
+    await using (var stream = File.Create(filePath))
+    {
+        await file.CopyToAsync(stream);
+    }
+
+    var fileUrl = $"/uploads/{fileName}";
+    return Results.Ok(new { Url = fileUrl });
 });
 
 homework.MapPost("/{id:int}/results", async (int id, HomeworkResult result, HomeworkHeroContext db) =>
