@@ -1,40 +1,85 @@
 @implements IDisposable
 
-<nav class="navbar">
-    <div class="brand">Homework Hero</div>
-    <div class="links">
-        <NavLink href="/" Match="NavLinkMatch.All">Home</NavLink>
-        <NavLink href="/students">Students</NavLink>
-        <NavLink href="/homework">Homework</NavLink>
-        <NavLink href="/student-homework">Student homework</NavLink>
-        <NavLink href="/teacher-dashboard">Teacher dashboard</NavLink>
-        @if (authState.IsAuthenticated && string.Equals(authState.Role, "Admin", StringComparison.OrdinalIgnoreCase))
-        {
-            <NavLink href="/admin">Admin</NavLink>
-            <NavLink href="/admin/classrooms">Classrooms</NavLink>
-        }
-        @if (!authState.IsAuthenticated)
-        {
-            <NavLink href="/login">Login</NavLink>
-        }
-    </div>
-    <div class="auth-status">
+<aside class="sidebar">
+    <div class="user-panel">
+        <div class="user-avatar">@UserInitials</div>
+        <div class="user-meta">
+            <div class="user-name">@UserLabel</div>
+            <div class="user-role">@UserRole</div>
+        </div>
         @if (authState.IsAuthenticated)
         {
-            <span>@authState.Email (@authState.Role)</span>
-            <button class="link" @onclick="Logout">Logout</button>
-        }
-        else
-        {
-            <span>Not signed in</span>
+            <button class="link logout" @onclick="Logout">Logout</button>
         }
     </div>
-</nav>
-<hr />
+
+    <nav class="sidebar-nav">
+        <div class="nav-section">
+            <div class="nav-section-title">Overview</div>
+            <NavLink href="/" Match="NavLinkMatch.All" class="nav-link" ActiveClass="active">
+                <span class="nav-icon" aria-hidden="true">🏠</span>
+                <span>Home</span>
+            </NavLink>
+            <NavLink href="/teacher-dashboard" class="nav-link" ActiveClass="active">
+                <span class="nav-icon" aria-hidden="true">📊</span>
+                <span>Teacher dashboard</span>
+            </NavLink>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-title">People & Homework</div>
+            <NavLink href="/students" class="nav-link" ActiveClass="active">
+                <span class="nav-icon" aria-hidden="true">👥</span>
+                <span>Students</span>
+            </NavLink>
+            <NavLink href="/homework" class="nav-link" ActiveClass="active">
+                <span class="nav-icon" aria-hidden="true">📝</span>
+                <span>Homework</span>
+            </NavLink>
+            <NavLink href="/student-homework" class="nav-link" ActiveClass="active">
+                <span class="nav-icon" aria-hidden="true">📚</span>
+                <span>Student homework</span>
+            </NavLink>
+        </div>
+
+        @if (authState.IsAuthenticated && string.Equals(authState.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            <div class="nav-section">
+                <div class="nav-section-title">Administration</div>
+                <NavLink href="/admin" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">🛠️</span>
+                    <span>Admin</span>
+                </NavLink>
+                <NavLink href="/admin/classrooms" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">🏫</span>
+                    <span>Classrooms</span>
+                </NavLink>
+            </div>
+        }
+
+        @if (!authState.IsAuthenticated)
+        {
+            <div class="nav-section">
+                <div class="nav-section-title">Account</div>
+                <NavLink href="/login" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">🔐</span>
+                    <span>Login</span>
+                </NavLink>
+            </div>
+        }
+    </nav>
+</aside>
 
 @code {
     [Inject]
     private AuthState authState { get; set; } = default!;
+
+    private string UserLabel => authState.IsAuthenticated ? authState.Email : "Guest visitor";
+    private string UserRole => authState.IsAuthenticated ? authState.Role : "Not signed in";
+    private string UserInitials
+        => authState.IsAuthenticated
+            ? (string.IsNullOrWhiteSpace(authState.Email) ? "?" : authState.Email![0].ToString().ToUpperInvariant())
+            : "?";
 
     protected override void OnInitialized()
     {

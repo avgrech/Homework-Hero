@@ -1,12 +1,60 @@
 @inherits LayoutComponentBase
+@inject IJSRuntime JS
 
 <PageTitle>Homework Hero</PageTitle>
 
-<div class="page">
-    <NavMenu />
-    <main>
-        <div class="content px-4">
-            @Body
+<div class="app-shell" data-theme="@CurrentTheme">
+    <header class="main-header">
+        <div class="brand">
+            <div class="brand-logo">HH</div>
+            <div class="brand-meta">
+                <div class="brand-title">Homework Hero</div>
+                <div class="brand-subtitle">Admin workspace</div>
+            </div>
         </div>
-    </main>
+        <div class="header-actions">
+            <button class="pill-button" type="button" @onclick="ToggleTheme">
+                <span class="pill-icon" aria-hidden="true">@(isDark ? "🌙" : "☀️")</span>
+                <span>@(isDark ? "Dark" : "Light") mode</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="main-body">
+        <NavMenu />
+        <main class="content-area">
+            <div class="content-surface">
+                @Body
+            </div>
+        </main>
+    </div>
 </div>
+
+@code {
+    private bool isDark;
+    private bool initialized;
+
+    private string CurrentTheme => isDark ? "dark" : "light";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var theme = await JS.InvokeAsync<string>("themeStore.init");
+            isDark = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
+            initialized = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        if (!initialized)
+        {
+            return;
+        }
+
+        isDark = !isDark;
+        await JS.InvokeVoidAsync("themeStore.setTheme", CurrentTheme);
+    }
+}
