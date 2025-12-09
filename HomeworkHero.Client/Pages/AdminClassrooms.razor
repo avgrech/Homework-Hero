@@ -104,7 +104,12 @@ else
     private List<Teacher> teachers = new();
     private List<Student> students = new();
     private List<ClassroomSummaryDto> classrooms = new();
-    private ClassroomAssignmentRequest assignment = new(0, string.Empty, new());
+    private ClassroomAssignmentRequest assignment = new()
+    {
+        TeacherId = 0,
+        GroupId = string.Empty,
+        StudentIds = new(),
+    };
 
     private string? StatusMessage;
     private bool IsError;
@@ -153,7 +158,12 @@ else
         if (response.IsSuccessStatusCode)
         {
             StatusMessage = "Classroom saved.";
-            assignment = new(assignment.TeacherId, assignment.GroupId, new List<int>());
+            assignment = new()
+            {
+                TeacherId = assignment.TeacherId,
+                GroupId = assignment.GroupId,
+                StudentIds = new List<int>(),
+            };
             await LoadData();
         }
         else
