@@ -13,7 +13,10 @@
             <NavLink href="/admin">Admin</NavLink>
             <NavLink href="/admin/classrooms">Classrooms</NavLink>
         }
-        <NavLink href="/login">Login</NavLink>
+        @if (!authState.IsAuthenticated)
+        {
+            <NavLink href="/login">Login</NavLink>
+        }
     </div>
     <div class="auth-status">
         @if (authState.IsAuthenticated)
@@ -43,9 +46,9 @@
         InvokeAsync(StateHasChanged);
     }
 
-    private void Logout()
+    private async Task Logout()
     {
-        authState.Clear();
+        await authState.ClearAsync();
     }
 
     public void Dispose()
