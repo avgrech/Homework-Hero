@@ -67,7 +67,7 @@
             var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
             if (result?.Success == true && !string.IsNullOrEmpty(result.Role))
             {
-                Auth.SetUser(loginModel.Identifier, result.Role);
+                await Auth.SetUserAsync(loginModel.Identifier, result.Role);
                 loginSuccess = true;
                 requiresReset = result.RequiresPasswordReset;
                 message = requiresReset
@@ -111,7 +111,7 @@
         {
             requiresReset = false;
             message = "Password updated. Please log in with your new password.";
-            Auth.Clear();
+            await Auth.ClearAsync();
         }
         else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
