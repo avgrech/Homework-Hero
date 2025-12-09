@@ -432,6 +432,104 @@ users.MapPost("/", async (RegisterUserRequest request, HomeworkHeroContext db) =
 
 var admin = app.MapGroup("/api/admin");
 
+admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
+{
+    var classrooms = await db.StudentTeachers
+        .Include(st => st.Teacher)
+        .Include(st => st.Student)
+        .GroupBy(st => new
+        {
+            st.GroupId,
+            st.TeacherId,
+            st.Teacher!.FirstName,
+            st.Teacher.LastName
+        })
+        .Select(g => new ClassroomSummaryDto(
+            g.Key.GroupId,
+            g.Key.TeacherId,
+            $"{g.Key.FirstName} {g.Key.LastName}",
+            g.Where(st => st.Student != null)
+                .Select(st => new StudentSummaryDto
+                {
+                    Id = st.StudentId,
+                    FirstName = st.Student!.FirstName,
+                    LastName = st.Student.LastName,
+                    IsChatBlocked = st.Student.IsChatBlocked
+                })
+                .OrderBy(s => s.LastName)
+                .ThenBy(s => s.FirstName)
+                .ToList()))
+        .OrderBy(c => c.GroupId)
+        .ThenBy(c => c.TeacherName)
+        .ToListAsync();
+
+    return classrooms;
+});
+
+admin.MapPost("/classrooms/assign", async (ClassroomAssignmentRequest request, HomeworkHeroContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(request.GroupId) || request.StudentIds is null || !request.StudentIds.Any())
+    {
+        return Results.BadRequest("A group name, teacher, and at least one student are required.");
+    }
+
+    var teacher = await db.Teachers.FindAsync(request.TeacherId);
+    if (teacher is null)
+    {
+        return Results.NotFound("Teacher not found");
+    }
+
+    var requestedStudentIds = request.StudentIds.Distinct().ToList();
+    var students = await db.Students
+        .Where(s => requestedStudentIds.Contains(s.Id))
+        .ToListAsync();
+
+    var missingStudents = requestedStudentIds.Except(students.Select(s => s.Id)).ToList();
+    if (students.Count == 0)
+    {
+        return Results.NotFound("No valid students were found for this assignment.");
+    }
+
+    var now = DateOnly.FromDateTime(DateTime.UtcNow);
+
+    var existingEnrollments = await db.StudentTeachers
+        .Where(st => requestedStudentIds.Contains(st.StudentId) && st.GroupId == request.GroupId)
+        .ToListAsync();
+
+    var toRemove = existingEnrollments
+        .Where(st => st.TeacherId != request.TeacherId)
+        .ToList();
+
+    if (toRemove.Any())
+    {
+        db.StudentTeachers.RemoveRange(toRemove);
+    }
+
+    foreach (var student in students)
+    {
+        var alreadyAssigned = existingEnrollments.Any(st => st.StudentId == student.Id && st.TeacherId == request.TeacherId);
+        if (!alreadyAssigned)
+        {
+            db.StudentTeachers.Add(new StudentTeacher
+            {
+                StudentId = student.Id,
+                TeacherId = request.TeacherId,
+                GroupId = request.GroupId,
+                StartDate = now
+            });
+        }
+    }
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        Assigned = students.Count - (existingEnrollments.Count - toRemove.Count),
+        Reassigned = toRemove.Count,
+        MissingStudents = missingStudents
+    });
+});
+
 admin.MapGet("/bulk-template", () =>
 {
     var template = new StringBuilder();
