@@ -11,6 +11,7 @@
         @if (authState.IsAuthenticated && string.Equals(authState.Role, "Admin", StringComparison.OrdinalIgnoreCase))
         {
             <NavLink href="/admin">Admin</NavLink>
+            <NavLink href="/admin/classrooms">Classrooms</NavLink>
         }
         <NavLink href="/login">Login</NavLink>
     </div>
