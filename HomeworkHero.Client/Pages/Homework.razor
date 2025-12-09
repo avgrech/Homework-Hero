@@ -35,8 +35,20 @@
         <label>Text content</label>
         <InputTextArea @bind-Value="newHomework.TextContent" />
 
-        <label>Image URL</label>
-        <InputText @bind-Value="newHomework.ImageUrl" />
+        <label>Image</label>
+        <InputFile OnChange="HandleImageUpload" />
+        @if (isUploadingImage)
+        {
+            <p class="muted">Uploading image...</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(uploadError))
+        {
+            <p class="error">@uploadError</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(newHomework.ImageUrl))
+        {
+            <p class="muted">Uploaded: <a href="@newHomework.ImageUrl" target="_blank">View image</a></p>
+        }
 
         <label>Date given</label>
         <InputDate TValue="DateOnly" @bind-Value="newHomework.DateAssigned" />
@@ -45,7 +57,7 @@
         <InputDate TValue="DateOnly" @bind-Value="newHomework.DueDate" />
 
         <label>Teacher</label>
-        <InputSelect @bind-Value="newHomework.TeacherId">
+        <InputSelect @bind-Value="newHomework.TeacherId" @onchange="OnTeacherChanged">
             <option value="">Select a teacher</option>
             @foreach (var teacher in teachers)
             {
@@ -54,10 +66,24 @@
         </InputSelect>
 
         <label>Group (optional)</label>
-        <InputText @bind-Value="newHomework.AssignedGroupId" />
+        <InputText @bind-Value="groupSearch" placeholder="Search groups" />
+        <InputSelect @bind-Value="newHomework.AssignedGroupId">
+            <option value="">Select a group</option>
+            @foreach (var group in FilteredGroups)
+            {
+                <option value="@group.GroupId">@group.GroupId (@group.Students.Count student(s))</option>
+            }
+        </InputSelect>
 
         <label>Student Id (optional)</label>
-        <InputNumber @bind-Value="newHomework.AssignedStudentId" />
+        <InputText @bind-Value="studentSearch" placeholder="Search students" />
+        <InputSelect @bind-Value="newHomework.AssignedStudentId">
+            <option value="">Assign to any student</option>
+            @foreach (var student in FilteredStudents)
+            {
+                <option value="@student.Id">@student.FirstName @student.LastName (@student.Id)</option>
+            }
+        </InputSelect>
 
         <button type="submit">Save homework</button>
     </div>
@@ -92,6 +118,9 @@ else
 @code {
     private List<Teacher> teachers = new();
     private List<HomeworkItem> homeworkItems = new();
+    private List<GroupSummaryDto> groups = new();
+    private List<StudentSummaryDto> students = new();
+    private List<StudentSummaryDto> allStudents = new();
     private List<string> subjects = new() { "Math", "Science", "History", "Language Arts", "Social Studies", "Art", "Music", "PE", "Other" };
 
     private Teacher newTeacher = new();
@@ -101,8 +130,22 @@ else
         DueDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7)
     };
 
+    private string groupSearch = string.Empty;
+    private string studentSearch = string.Empty;
+    private bool isUploadingImage;
+    private string? uploadError;
+
+    private IEnumerable<GroupSummaryDto> FilteredGroups => groups
+        .Where(g => string.IsNullOrWhiteSpace(groupSearch) || g.GroupId.Contains(groupSearch, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<StudentSummaryDto> FilteredStudents => students
+        .Where(s => string.IsNullOrWhiteSpace(studentSearch)
+            || $"{s.FirstName} {s.LastName}".Contains(studentSearch, StringComparison.OrdinalIgnoreCase)
+            || s.Id.ToString().Contains(studentSearch, StringComparison.OrdinalIgnoreCase));
+
     protected override async Task OnInitializedAsync()
     {
+        await LoadStudents();
         await LoadTeachers();
         await LoadHomework();
     }
@@ -110,6 +153,28 @@ else
     private async Task LoadTeachers()
     {
         teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
+
+        if (teachers.Any() && newHomework.TeacherId == 0)
+        {
+            newHomework.TeacherId = teachers.First().Id;
+            await LoadGroupsForTeacher(newHomework.TeacherId);
+        }
+    }
+
+    private async Task LoadStudents()
+    {
+        var studentEntities = await Http.GetFromJsonAsync<List<Student>>("api/students") ?? new();
+        allStudents = studentEntities
+            .Select(s => new StudentSummaryDto
+            {
+                Id = s.Id,
+                FirstName = s.FirstName,
+                LastName = s.LastName,
+                IsChatBlocked = s.IsChatBlocked
+            })
+            .ToList();
+
+        students = new(allStudents);
     }
 
     private async Task LoadHomework()
@@ -133,6 +198,7 @@ else
 
     private async Task CreateHomework()
     {
+        var selectedTeacherId = newHomework.TeacherId;
         var response = await Http.PostAsJsonAsync("api/homework", newHomework);
         if (response.IsSuccessStatusCode)
         {
@@ -143,9 +209,98 @@ else
                 newHomework = new()
                 {
                     DateAssigned = DateOnly.FromDateTime(DateTime.UtcNow),
-                    DueDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7)
+                    DueDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7),
+                    TeacherId = selectedTeacherId
                 };
+                groupSearch = string.Empty;
+                studentSearch = string.Empty;
+                newHomework.AssignedGroupId = string.Empty;
+                newHomework.AssignedStudentId = null;
+                newHomework.ImageUrl = null;
+                await LoadGroupsForTeacher(selectedTeacherId);
             }
         }
+    }
+
+    private async Task LoadGroupsForTeacher(int teacherId)
+    {
+        if (teacherId == 0)
+        {
+            groups.Clear();
+            students = new(allStudents);
+            return;
+        }
+
+        groups = await Http.GetFromJsonAsync<List<GroupSummaryDto>>($"api/teachers/{teacherId}/groups") ?? new();
+        var teacherStudents = groups
+            .SelectMany(g => g.Students)
+            .GroupBy(s => s.Id)
+            .Select(g => g.First())
+            .ToList();
+
+        students = teacherStudents.Any() ? teacherStudents : new(allStudents);
+        newHomework.AssignedGroupId = string.Empty;
+        newHomework.AssignedStudentId = null;
+    }
+
+    private async Task OnTeacherChanged(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var teacherId))
+        {
+            newHomework.TeacherId = teacherId;
+            await LoadGroupsForTeacher(teacherId);
+        }
+        else
+        {
+            newHomework.TeacherId = 0;
+            groups.Clear();
+            students = new(allStudents);
+        }
+    }
+
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        uploadError = null;
+        isUploadingImage = true;
+
+        try
+        {
+            var file = e.File;
+            if (file is null)
+            {
+                uploadError = "Please select a file.";
+                return;
+            }
+
+            using var content = new MultipartFormDataContent();
+            await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+            var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+            content.Add(fileContent, "file", file.Name);
+
+            var response = await Http.PostAsync("api/uploads", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<UploadResponse>();
+                newHomework.ImageUrl = result?.Url;
+            }
+            else
+            {
+                uploadError = "Upload failed. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Upload failed: {ex.Message}";
+        }
+        finally
+        {
+            isUploadingImage = false;
+        }
+    }
+
+    private class UploadResponse
+    {
+        public string? Url { get; set; }
     }
 }
