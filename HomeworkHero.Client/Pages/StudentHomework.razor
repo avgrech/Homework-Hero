@@ -1,5 +1,6 @@
 @page "/student-homework"
 @inject HttpClient Http
+@inject AuthState Auth
 
 <h1>Pending homework</h1>
 <p>See everything that's due and jump straight into completing the task.</p>
@@ -25,6 +26,10 @@
 @if (isLoading)
 {
     <p>Loading homework...</p>
+}
+else if (!string.IsNullOrWhiteSpace(accessMessage))
+{
+    <p>@accessMessage</p>
 }
 else if (!FilteredHomework.Any())
 {
@@ -85,12 +90,16 @@ else
     private List<HomeworkItem> homeworkItems = new();
     private List<Teacher> teachers = new();
     private bool isLoading = true;
+    private string? accessMessage;
 
     private string teacherFilter = string.Empty;
     private DateOnly? assignedFilter;
     private DateOnly? dueFilter;
 
     private HomeworkItem? selectedHomework;
+
+    private bool IsStudent => string.Equals(Auth.Role, "Student", StringComparison.OrdinalIgnoreCase);
+    private bool IsTeacher => string.Equals(Auth.Role, "Teacher", StringComparison.OrdinalIgnoreCase);
 
     private IEnumerable<HomeworkItem> FilteredHomework => homeworkItems
         .Where(hw => string.IsNullOrWhiteSpace(teacherFilter) || TeacherName(hw).Contains(teacherFilter, StringComparison.OrdinalIgnoreCase))
@@ -100,9 +109,49 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>("api/homework") ?? new();
+        await LoadHomeworkForUserAsync();
         teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
+        if (IsTeacher && Auth.TeacherId.HasValue)
+        {
+            teachers = teachers.Where(t => t.Id == Auth.TeacherId.Value).ToList();
+        }
+        else if (IsStudent)
+        {
+            var teacherIds = homeworkItems.Select(hw => hw.TeacherId).Distinct().ToHashSet();
+            teachers = teachers.Where(t => teacherIds.Contains(t.Id)).ToList();
+        }
         isLoading = false;
+    }
+
+    private async Task LoadHomeworkForUserAsync()
+    {
+        if (IsStudent && Auth.StudentId.HasValue)
+        {
+            homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>($"api/homework/student/{Auth.StudentId.Value}") ?? new();
+            return;
+        }
+
+        if (IsTeacher && Auth.TeacherId.HasValue)
+        {
+            homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>($"api/homework/teacher/{Auth.TeacherId.Value}") ?? new();
+            return;
+        }
+
+        if (IsTeacher && !Auth.TeacherId.HasValue)
+        {
+            accessMessage = "No teacher profile is linked to this account.";
+            homeworkItems = new();
+            return;
+        }
+
+        if (IsStudent && !Auth.StudentId.HasValue)
+        {
+            accessMessage = "No student profile is linked to this account.";
+            homeworkItems = new();
+            return;
+        }
+
+        homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>("api/homework") ?? new();
     }
 
     private string GetStatusClass(HomeworkItem hw)

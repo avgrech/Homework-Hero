@@ -55,11 +55,13 @@
     private string? message;
     private bool loginSuccess;
     private bool requiresReset;
+    private LoginResponse? pendingLogin;
 
     private async Task HandleLogin()
     {
         message = null;
         loginSuccess = false;
+        pendingLogin = null;
 
         var response = await Http.PostAsJsonAsync("api/auth/login", new LoginRequest(loginModel.Identifier, loginModel.Password));
         if (response.IsSuccessStatusCode)
@@ -67,14 +69,23 @@
             var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
             if (result?.Success == true && !string.IsNullOrEmpty(result.Role))
             {
-                await Auth.SetUserAsync(loginModel.Identifier, result.Role);
-                loginSuccess = true;
+                pendingLogin = result;
                 requiresReset = result.RequiresPasswordReset;
-                message = requiresReset
-                    ? "Password reset required before continuing."
-                    : $"Welcome back, {loginModel.Identifier}! Role: {result.Role}";
-                resetModel.Identifier = loginModel.Identifier;
+                var userEmail = result.Email ?? loginModel.Identifier;
+                resetModel.Identifier = userEmail;
                 resetModel.CurrentPassword = loginModel.Password;
+
+                if (requiresReset)
+                {
+                    await Auth.ClearAsync();
+                    message = "Password reset required before continuing.";
+                }
+                else
+                {
+                    await Auth.SetUserAsync(userEmail, result.Role, result.StudentId, result.TeacherId);
+                    loginSuccess = true;
+                    message = $"Welcome back, {userEmail}! Role: {result.Role}";
+                }
             }
             else
             {
@@ -110,8 +121,16 @@
         if (response.IsSuccessStatusCode)
         {
             requiresReset = false;
-            message = "Password updated. Please log in with your new password.";
-            await Auth.ClearAsync();
+            message = "Password updated. You're now signed in with your new password.";
+            if (pendingLogin?.Role is not null)
+            {
+                await Auth.SetUserAsync(pendingLogin.Email ?? resetModel.Identifier, pendingLogin.Role, pendingLogin.StudentId, pendingLogin.TeacherId);
+                loginSuccess = true;
+            }
+            else
+            {
+                await Auth.ClearAsync();
+            }
         }
         else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {

@@ -241,7 +241,14 @@ public class UserPermission
 
 public record LoginRequest(string Identifier, string Password);
 
-public record LoginResponse(bool Success, string? Role, string? Message = null, bool RequiresPasswordReset = false);
+public record LoginResponse(
+    bool Success,
+    string? Role,
+    string? Message = null,
+    bool RequiresPasswordReset = false,
+    string? Email = null,
+    int? StudentId = null,
+    int? TeacherId = null);
 
 public record ResetPasswordRequest(string Identifier, string CurrentPassword, string NewPassword);
 

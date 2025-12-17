@@ -1,20 +1,34 @@
 @page "/teacher-dashboard"
 @inject HttpClient Http
+@inject AuthState Auth
 
 <h1>Teacher dashboard</h1>
 <p>View groups, students, homework progress, chats, and emergency controls.</p>
 
-<div class="card">
-    <label>Teacher</label>
-    <InputSelect @bind-Value="teacherId">
-        <option value="0" disabled>Select a teacher</option>
-        @foreach (var teacher in teachers)
+@if (!string.IsNullOrWhiteSpace(accessMessage))
+{
+    <p>@accessMessage</p>
+}
+else
+{
+    <div class="card">
+        <label>Teacher</label>
+        @if (IsTeacher)
         {
-            <option value="@teacher.Id">@teacher.FirstName @teacher.LastName</option>
+            <p>@TeacherName</p>
         }
-    </InputSelect>
-    <button @onclick="LoadDashboard" disabled="@(teacherId == 0)">Load dashboard</button>
-</div>
+        else
+        {
+            <InputSelect @bind-Value="teacherId">
+                <option value="0" disabled>Select a teacher</option>
+                @foreach (var teacher in teachers)
+                {
+                    <option value="@teacher.Id">@teacher.FirstName @teacher.LastName</option>
+                }
+            </InputSelect>
+            <button @onclick="LoadDashboard" disabled="@(teacherId == 0)">Load dashboard</button>
+        }
+    </div>
 
 @if (notifications is not null)
 {
@@ -142,6 +156,8 @@ else
     </div>
 }
 
+}
+
 @code {
     private int teacherId;
     private List<Teacher> teachers = new();
@@ -150,10 +166,44 @@ else
     private StudentSummaryDto? selectedStudent;
     private List<StudentHomeworkSummaryDto>? studentHomework;
     private StudentHomeworkDetailDto? homeworkDetail;
+    private string? accessMessage;
+
+    private bool IsTeacher => string.Equals(Auth.Role, "Teacher", StringComparison.OrdinalIgnoreCase);
+    private string TeacherName
+        => teachers.FirstOrDefault(t => t.Id == teacherId) is Teacher teacher
+            ? $"{teacher.FirstName} {teacher.LastName}"
+            : "Select a teacher";
 
     protected override async Task OnInitializedAsync()
     {
+        if (!Auth.IsAuthenticated)
+        {
+            accessMessage = "Please sign in to view your dashboard.";
+            return;
+        }
+
+        if (string.Equals(Auth.Role, "Student", StringComparison.OrdinalIgnoreCase))
+        {
+            accessMessage = "Students can explore homework from the Home and Homework pages.";
+            return;
+        }
+
         teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
+
+        if (IsTeacher)
+        {
+            if (!Auth.TeacherId.HasValue)
+            {
+                accessMessage = "No teacher profile is linked to this account.";
+                return;
+            }
+
+            teacherId = Auth.TeacherId.Value;
+            teachers = teachers.Where(t => t.Id == teacherId).ToList();
+            await LoadDashboard();
+            return;
+        }
+
         if (teacherId == 0 && teachers.Any())
         {
             teacherId = teachers.First().Id;

@@ -1,5 +1,6 @@
 @page "/"
 @inject HttpClient Http
+@inject AuthState Auth
 
 <div class="welcome-hero">
     <div>
@@ -150,8 +151,31 @@
 
     protected override async Task OnInitializedAsync()
     {
-        homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>("api/homework") ?? new();
+        homeworkItems = await LoadHomeworkForUser();
         isLoading = false;
+    }
+
+    private async Task<List<HomeworkItem>> LoadHomeworkForUser()
+    {
+        if (Auth.IsAuthenticated)
+        {
+            if (string.Equals(Auth.Role, "Student", StringComparison.OrdinalIgnoreCase) && Auth.StudentId.HasValue)
+            {
+                return await Http.GetFromJsonAsync<List<HomeworkItem>>($"api/homework/student/{Auth.StudentId.Value}") ?? new();
+            }
+
+            if (string.Equals(Auth.Role, "Student", StringComparison.OrdinalIgnoreCase) && !Auth.StudentId.HasValue)
+            {
+                return new List<HomeworkItem>();
+            }
+
+            if (string.Equals(Auth.Role, "Teacher", StringComparison.OrdinalIgnoreCase) && Auth.TeacherId.HasValue)
+            {
+                return await Http.GetFromJsonAsync<List<HomeworkItem>>($"api/homework/teacher/{Auth.TeacherId.Value}") ?? new();
+            }
+        }
+
+        return await Http.GetFromJsonAsync<List<HomeworkItem>>("api/homework") ?? new();
     }
 
     private string DueLabel(HomeworkItem hw)
