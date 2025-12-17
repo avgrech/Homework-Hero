@@ -5,9 +5,15 @@
 <p>View groups, students, homework progress, chats, and emergency controls.</p>
 
 <div class="card">
-    <label>Teacher ID</label>
-    <InputNumber @bind-Value="teacherId" />
-    <button @onclick="LoadDashboard">Load dashboard</button>
+    <label>Teacher</label>
+    <InputSelect @bind-Value="teacherId">
+        <option value="0" disabled>Select a teacher</option>
+        @foreach (var teacher in teachers)
+        {
+            <option value="@teacher.Id">@teacher.FirstName @teacher.LastName</option>
+        }
+    </InputSelect>
+    <button @onclick="LoadDashboard" disabled="@(teacherId == 0)">Load dashboard</button>
 </div>
 
 @if (notifications is not null)
@@ -30,7 +36,7 @@
 
 @if (groups is null)
 {
-    <p>Enter a teacher id to load groups.</p>
+    <p>Select a teacher to load groups.</p>
 }
 else if (!groups.Any())
 {
@@ -137,15 +143,30 @@ else
 }
 
 @code {
-    private int teacherId = 1;
+    private int teacherId;
+    private List<Teacher> teachers = new();
     private List<GroupSummaryDto>? groups;
     private List<NotificationDto>? notifications;
     private StudentSummaryDto? selectedStudent;
     private List<StudentHomeworkSummaryDto>? studentHomework;
     private StudentHomeworkDetailDto? homeworkDetail;
 
+    protected override async Task OnInitializedAsync()
+    {
+        teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
+        if (teacherId == 0 && teachers.Any())
+        {
+            teacherId = teachers.First().Id;
+        }
+    }
+
     private async Task LoadDashboard()
     {
+        if (teacherId == 0)
+        {
+            return;
+        }
+
         groups = await Http.GetFromJsonAsync<List<GroupSummaryDto>>($"api/teachers/{teacherId}/groups") ?? new();
         notifications = await Http.GetFromJsonAsync<List<NotificationDto>>($"api/teachers/{teacherId}/notifications") ?? new();
         selectedStudent = null;
