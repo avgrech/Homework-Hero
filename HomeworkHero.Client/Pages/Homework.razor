@@ -153,7 +153,7 @@ else
     private List<GroupSummaryDto> groups = new();
     private List<StudentSummaryDto> students = new();
     private List<StudentSummaryDto> allStudents = new();
-    private List<string> subjects = new() { "Math", "Science", "History", "Language Arts", "Social Studies", "Art", "Music", "PE", "Other" };
+    private static readonly List<string> subjects = new() { "Math", "Science", "History", "Language Arts", "Social Studies", "Art", "Music", "PE", "Other" };
 
     private HomeworkItem newHomework = new()
     {
