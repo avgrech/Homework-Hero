@@ -1,2 +1,168 @@
-<h1>Welcome to Homework Hero</h1>
-<p>Use the navigation links to manage students, teachers, homework, and submissions.</p>
+@page "/"
+@inject HttpClient Http
+
+<div class="welcome-hero">
+    <div>
+        <p class="eyebrow">Home</p>
+        <h1>Welcome to Homework Hero</h1>
+        <p class="hero-lede">Track what's coming up, jump back into recent work, and celebrate the wins your students have already shipped.</p>
+        <div class="hero-actions">
+            <a class="primary" href="/student-homework">View pending homework</a>
+            <a class="secondary" href="/homework">Assign new homework</a>
+        </div>
+    </div>
+    <div class="hero-summary">
+        <div class="mini-metric">
+            <p class="muted">Active assignments</p>
+            <h3>@PendingHomework.Count()</h3>
+            <p class="muted small">Due within the next week</p>
+        </div>
+        <div class="mini-metric">
+            <p class="muted">Completed</p>
+            <h3>@CompletedHomework.Count()</h3>
+            <p class="muted small">Past their due date</p>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <section class="card accent">
+        <p class="eyebrow">At a glance</p>
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <p class="muted">Total homework</p>
+                <h2>@homeworkItems.Count</h2>
+                <p class="muted small">All assignments across your classes</p>
+            </div>
+            <div class="metric-card">
+                <p class="muted">Pending</p>
+                <h2>@PendingHomework.Count()</h2>
+                <p class="muted small">Due today or later</p>
+            </div>
+            <div class="metric-card">
+                <p class="muted">Due soon</p>
+                <h2>@DueSoonHomework.Count()</h2>
+                <p class="muted small">Due in the next 3 days</p>
+            </div>
+            <div class="metric-card">
+                <p class="muted">Completed</p>
+                <h2>@CompletedHomework.Count()</h2>
+                <p class="muted small">Past due and ready for review</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="section-header">
+            <div>
+                <p class="eyebrow">Pending homework</p>
+                <h3>Stay ahead of upcoming deadlines</h3>
+            </div>
+            <a class="link" href="/student-homework">View all</a>
+        </div>
+        @if (isLoading)
+        {
+            <p class="muted">Loading homework...</p>
+        }
+        else if (!PendingHomework.Any())
+        {
+            <p class="muted">No pending homework right now.</p>
+        }
+        else
+        {
+            <div class="list-grid">
+                @foreach (var hw in PendingHomework)
+                {
+                    <div class="list-card">
+                        <div class="list-card__header">
+                            <div>
+                                <p class="eyebrow">@hw.Subject</p>
+                                <h4>@hw.Title</h4>
+                            </div>
+                            <span class="status-chip">@DueLabel(hw)</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(hw.TextContent))
+                        {
+                            <p class="muted">@hw.TextContent</p>
+                        }
+                        <div class="list-card__footer">
+                            <span class="muted small">Due: @hw.DueDate</span>
+                            <a class="primary ghost" href="@($"/homework-workspace/{hw.Id}")">Open workspace</a>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="card">
+        <div class="section-header">
+            <div>
+                <p class="eyebrow">Completed</p>
+                <h3>Homework past their due date</h3>
+            </div>
+        </div>
+        @if (isLoading)
+        {
+            <p class="muted">Loading homework...</p>
+        }
+        else if (!CompletedHomework.Any())
+        {
+            <p class="muted">No completed homework to review yet.</p>
+        }
+        else
+        {
+            <div class="list-grid">
+                @foreach (var hw in CompletedHomework)
+                {
+                    <div class="list-card subdued">
+                        <div class="list-card__header">
+                            <div>
+                                <p class="eyebrow">@hw.Subject</p>
+                                <h4>@hw.Title</h4>
+                            </div>
+                            <span class="status-chip neutral">Due @hw.DueDate</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(hw.TextContent))
+                        {
+                            <p class="muted">@hw.TextContent</p>
+                        }
+                        <div class="list-card__footer">
+                            <span class="muted small">Assigned: @hw.DateAssigned</span>
+                            <a class="secondary" href="@($"/homework-workspace/{hw.Id}")">View details</a>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private List<HomeworkItem> homeworkItems = new();
+    private bool isLoading = true;
+
+    private IEnumerable<HomeworkItem> PendingHomework => homeworkItems.Where(hw => hw.DueDate >= Today);
+    private IEnumerable<HomeworkItem> CompletedHomework => homeworkItems.Where(hw => hw.DueDate < Today);
+    private IEnumerable<HomeworkItem> DueSoonHomework => homeworkItems.Where(hw => hw.DueDate >= Today && hw.DueDate <= Today.AddDays(3));
+
+    private DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+
+    protected override async Task OnInitializedAsync()
+    {
+        homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>("api/homework") ?? new();
+        isLoading = false;
+    }
+
+    private string DueLabel(HomeworkItem hw)
+    {
+        var days = (hw.DueDate.ToDateTime(TimeOnly.MinValue) - Today.ToDateTime(TimeOnly.MinValue)).Days;
+        return days switch
+        {
+            0 => "Due today",
+            1 => "Due tomorrow",
+            _ when days < 0 => "Past due",
+            _ => $"Due in {days} days"
+        };
+    }
+}
