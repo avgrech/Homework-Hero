@@ -170,6 +170,36 @@ teachers.MapPost("/", async (Teacher teacher, HomeworkHeroContext db) =>
     return Results.Created($"/api/teachers/{teacher.Id}", teacher);
 });
 
+teachers.MapPut("/{id:int}", async (int id, Teacher updatedTeacher, HomeworkHeroContext db) =>
+{
+    var existing = await db.Teachers.FindAsync(id);
+    if (existing is null)
+    {
+        return Results.NotFound();
+    }
+
+    existing.FirstName = updatedTeacher.FirstName;
+    existing.LastName = updatedTeacher.LastName;
+    existing.Email = updatedTeacher.Email;
+    existing.Details = updatedTeacher.Details;
+
+    await db.SaveChangesAsync();
+    return Results.Ok(existing);
+});
+
+teachers.MapDelete("/{id:int}", async (int id, HomeworkHeroContext db) =>
+{
+    var existing = await db.Teachers.FindAsync(id);
+    if (existing is null)
+    {
+        return Results.NotFound();
+    }
+
+    db.Teachers.Remove(existing);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+});
+
 teachers.MapGet("/{id:int}/groups", async (int id, HomeworkHeroContext db) =>
 {
     var groups = await db.StudentTeachers
