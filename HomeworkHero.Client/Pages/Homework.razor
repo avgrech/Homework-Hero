@@ -3,27 +3,7 @@
 @inject AuthState Auth
 
 <h1>Homework</h1>
-<p>Create teachers and assign homework to a group or specific student.</p>
-
-<h3>New teacher</h3>
-<EditForm Model="newTeacher" OnValidSubmit="CreateTeacher">
-    <DataAnnotationsValidator />
-    <div class="card">
-        <label>First name</label>
-        <InputText @bind-Value="newTeacher.FirstName" />
-
-        <label>Last name</label>
-        <InputText @bind-Value="newTeacher.LastName" />
-
-        <label>Email</label>
-        <InputText @bind-Value="newTeacher.Email" />
-
-        <label>Details</label>
-        <InputTextArea @bind-Value="newTeacher.Details" />
-
-        <button type="submit">Save teacher</button>
-    </div>
-</EditForm>
+<p>Assign homework to a group or specific student.</p>
 
 <h3>Create homework</h3>
 <EditForm Model="newHomework" OnValidSubmit="CreateHomework">
@@ -124,7 +104,6 @@ else
     private List<StudentSummaryDto> allStudents = new();
     private List<string> subjects = new() { "Math", "Science", "History", "Language Arts", "Social Studies", "Art", "Music", "PE", "Other" };
 
-    private Teacher newTeacher = new();
     private HomeworkItem newHomework = new()
     {
         DateAssigned = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -191,20 +170,6 @@ else
     private async Task LoadHomework()
     {
         homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>("api/homework") ?? new();
-    }
-
-    private async Task CreateTeacher()
-    {
-        var response = await Http.PostAsJsonAsync("api/teachers", newTeacher);
-        if (response.IsSuccessStatusCode)
-        {
-            var created = await response.Content.ReadFromJsonAsync<Teacher>();
-            if (created is not null)
-            {
-                teachers.Add(created);
-                newTeacher = new();
-            }
-        }
     }
 
     private async Task CreateHomework()

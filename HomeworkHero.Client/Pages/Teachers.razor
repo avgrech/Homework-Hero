@@ -1,0 +1,156 @@
+@page "/teachers"
+@inject HttpClient Http
+
+<h1>Teachers</h1>
+<p>Create and manage teacher records.</p>
+
+<EditForm Model="newTeacher" OnValidSubmit="CreateTeacher">
+    <DataAnnotationsValidator />
+    <div class="card">
+        <label>First name</label>
+        <InputText @bind-Value="newTeacher.FirstName" />
+
+        <label>Last name</label>
+        <InputText @bind-Value="newTeacher.LastName" />
+
+        <label>Email</label>
+        <InputText @bind-Value="newTeacher.Email" />
+
+        <label>Details</label>
+        <InputTextArea @bind-Value="newTeacher.Details" />
+
+        <button type="submit">Save teacher</button>
+    </div>
+</EditForm>
+
+@if (teachers is null)
+{
+    <p>Loading teachers...</p>
+}
+else if (!teachers.Any())
+{
+    <p>No teachers yet.</p>
+}
+else
+{
+    @foreach (var teacher in teachers)
+    {
+        <div class="card">
+            @if (editingTeacher?.Id == teacher.Id)
+            {
+                <EditForm Model="editingTeacher" OnValidSubmit="UpdateTeacher">
+                    <DataAnnotationsValidator />
+                    <label>First name</label>
+                    <InputText @bind-Value="editingTeacher!.FirstName" />
+
+                    <label>Last name</label>
+                    <InputText @bind-Value="editingTeacher!.LastName" />
+
+                    <label>Email</label>
+                    <InputText @bind-Value="editingTeacher!.Email" />
+
+                    <label>Details</label>
+                    <InputTextArea @bind-Value="editingTeacher!.Details" />
+
+                    <div class="button-row">
+                        <button type="submit">Save changes</button>
+                        <button type="button" class="secondary" @onclick="CancelEdit">Cancel</button>
+                    </div>
+                </EditForm>
+            }
+            else
+            {
+                <h3>@teacher.FirstName @teacher.LastName</h3>
+                <p><strong>Email:</strong> @teacher.Email</p>
+                @if (!string.IsNullOrWhiteSpace(teacher.Details))
+                {
+                    <p>@teacher.Details</p>
+                }
+
+                <div class="button-row">
+                    <button type="button" class="secondary" @onclick="(() => BeginEdit(teacher))">Edit</button>
+                    <button type="button" class="danger" @onclick="(() => DeleteTeacher(teacher.Id))">Delete</button>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    private List<Teacher>? teachers;
+    private Teacher newTeacher = new();
+    private Teacher? editingTeacher;
+
+    protected override async Task OnInitializedAsync()
+    {
+        teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
+    }
+
+    private async Task CreateTeacher()
+    {
+        var response = await Http.PostAsJsonAsync("api/teachers", newTeacher);
+        if (response.IsSuccessStatusCode)
+        {
+            var created = await response.Content.ReadFromJsonAsync<Teacher>();
+            if (created is not null)
+            {
+                teachers ??= new();
+                teachers.Add(created);
+                newTeacher = new();
+            }
+        }
+    }
+
+    private void BeginEdit(Teacher teacher)
+    {
+        editingTeacher = new Teacher
+        {
+            Id = teacher.Id,
+            FirstName = teacher.FirstName,
+            LastName = teacher.LastName,
+            Email = teacher.Email,
+            Details = teacher.Details
+        };
+    }
+
+    private void CancelEdit()
+    {
+        editingTeacher = null;
+    }
+
+    private async Task UpdateTeacher()
+    {
+        if (editingTeacher is null)
+        {
+            return;
+        }
+
+        var response = await Http.PutAsJsonAsync($"api/teachers/{editingTeacher.Id}", editingTeacher);
+        if (response.IsSuccessStatusCode && teachers is not null)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<Teacher>() ?? editingTeacher;
+            var existing = teachers.FirstOrDefault(t => t.Id == editingTeacher.Id);
+            if (existing is not null)
+            {
+                existing.FirstName = updated.FirstName;
+                existing.LastName = updated.LastName;
+                existing.Email = updated.Email;
+                existing.Details = updated.Details;
+            }
+            editingTeacher = null;
+        }
+    }
+
+    private async Task DeleteTeacher(int teacherId)
+    {
+        var response = await Http.DeleteAsync($"api/teachers/{teacherId}");
+        if (response.IsSuccessStatusCode && teachers is not null)
+        {
+            teachers.RemoveAll(t => t.Id == teacherId);
+            if (editingTeacher?.Id == teacherId)
+            {
+                editingTeacher = null;
+            }
+        }
+    }
+}
