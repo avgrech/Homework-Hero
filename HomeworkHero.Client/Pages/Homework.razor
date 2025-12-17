@@ -10,10 +10,17 @@
         <h1>Homework</h1>
         <p>Assign homework to a group or specific student.</p>
     </div>
-    <button class="primary" @onclick="OpenCreateModal">Create homework</button>
+    @if (CanCreateHomework)
+    {
+        <button class="primary" @onclick="OpenCreateModal">Create homework</button>
+    }
 </div>
 
-@if (showCreateModal)
+@if (!string.IsNullOrWhiteSpace(accessMessage))
+{
+    <p>@accessMessage</p>
+}
+else if (showCreateModal)
 {
     <div class="modal-backdrop" @onclick="CloseCreateModal">
         <div class="modal-panel" @onclick:stopPropagation>
@@ -79,7 +86,7 @@
                 <div class="form-row">
                     <label>Teacher</label>
                     <InputText class="text-input" @bind-Value="teacherSearch" placeholder="Search teachers" />
-                    <InputSelect class="text-input" @bind-Value="newHomework.TeacherId" @onchange="OnTeacherChanged">
+                    <InputSelect class="text-input" @bind-Value="newHomework.TeacherId" @onchange="OnTeacherChanged" disabled="@IsTeacher">
                         <option value="">Select a teacher</option>
                         @foreach (var teacher in FilteredTeachers)
                         {
@@ -121,7 +128,11 @@
     </div>
 }
 
-@if (!homeworkItems.Any())
+@if (!string.IsNullOrWhiteSpace(accessMessage))
+{
+    <p>@accessMessage</p>
+}
+else if (!homeworkItems.Any())
 {
     <p>No homework yet.</p>
 }
@@ -162,6 +173,8 @@ else
         Subject = subjects.First()
     };
 
+    private string? accessMessage;
+
     private string teacherSearch = string.Empty;
     private string groupSearch = string.Empty;
     private string studentSearch = string.Empty;
@@ -192,6 +205,20 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        if (IsStudent)
+        {
+            accessMessage = "Students can view their assignments from the Homework page.";
+            homeworkItems.Clear();
+            return;
+        }
+
+        if (IsTeacher && !Auth.TeacherId.HasValue)
+        {
+            accessMessage = "No teacher profile is linked to this account.";
+            homeworkItems.Clear();
+            return;
+        }
+
         await LoadStudents();
         await LoadTeachers();
         await LoadHomework();
@@ -200,6 +227,14 @@ else
     private async Task LoadTeachers()
     {
         teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
+
+        if (IsTeacher && Auth.TeacherId.HasValue)
+        {
+            teachers = teachers.Where(t => t.Id == Auth.TeacherId.Value).ToList();
+            newHomework.TeacherId = Auth.TeacherId.Value;
+            await LoadGroupsForTeacher(newHomework.TeacherId);
+            return;
+        }
 
         if (teachers.Any() && newHomework.TeacherId == 0)
         {
@@ -210,7 +245,15 @@ else
 
     private async Task LoadStudents()
     {
-        var studentEntities = await Http.GetFromJsonAsync<List<Student>>("api/students") ?? new();
+        List<Student> studentEntities;
+        if (IsTeacher && Auth.TeacherId.HasValue)
+        {
+            studentEntities = await Http.GetFromJsonAsync<List<Student>>($"api/teachers/{Auth.TeacherId.Value}/students") ?? new();
+        }
+        else
+        {
+            studentEntities = await Http.GetFromJsonAsync<List<Student>>("api/students") ?? new();
+        }
         allStudents = studentEntities
             .Select(s => new StudentSummaryDto
             {
@@ -226,11 +269,27 @@ else
 
     private async Task LoadHomework()
     {
+        if (IsTeacher && Auth.TeacherId.HasValue)
+        {
+            homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>($"api/homework/teacher/{Auth.TeacherId.Value}") ?? new();
+            return;
+        }
+
         homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>("api/homework") ?? new();
     }
 
     private async Task CreateHomework()
     {
+        if (!CanCreateHomework)
+        {
+            return;
+        }
+
+        if (IsTeacher && Auth.TeacherId.HasValue)
+        {
+            newHomework.TeacherId = Auth.TeacherId.Value;
+        }
+
         var selectedTeacherId = newHomework.TeacherId;
         var response = await Http.PostAsJsonAsync("api/homework", newHomework);
         if (response.IsSuccessStatusCode)
@@ -320,6 +379,11 @@ else
 
     private async Task LoadGroupsForTeacher(int teacherId)
     {
+        if (IsTeacher && Auth.TeacherId.HasValue)
+        {
+            teacherId = Auth.TeacherId.Value;
+        }
+
         if (teacherId == 0)
         {
             groups.Clear();
@@ -341,6 +405,13 @@ else
 
     private async Task OnTeacherChanged(ChangeEventArgs args)
     {
+        if (IsTeacher && Auth.TeacherId.HasValue)
+        {
+            newHomework.TeacherId = Auth.TeacherId.Value;
+            await LoadGroupsForTeacher(newHomework.TeacherId);
+            return;
+        }
+
         if (int.TryParse(args.Value?.ToString(), out var teacherId))
         {
             newHomework.TeacherId = teacherId;
@@ -399,4 +470,8 @@ else
     {
         public string? Url { get; set; }
     }
+
+    private bool IsTeacher => string.Equals(Auth.Role, "Teacher", StringComparison.OrdinalIgnoreCase);
+    private bool IsStudent => string.Equals(Auth.Role, "Student", StringComparison.OrdinalIgnoreCase);
+    private bool CanCreateHomework => !IsStudent && (!IsTeacher || Auth.TeacherId.HasValue);
 }

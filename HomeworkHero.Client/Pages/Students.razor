@@ -1,54 +1,70 @@
 @page "/students"
 @inject HttpClient Http
+@inject AuthState Auth
 
 <h1>Students</h1>
 <p>Add a student and see existing records.</p>
 
-<EditForm Model="newStudent" OnValidSubmit="CreateStudent">
-    <DataAnnotationsValidator />
-    <div class="card">
-        <label>First name</label>
-        <InputText @bind-Value="newStudent.FirstName" />
-
-        <label>Last name</label>
-        <InputText @bind-Value="newStudent.LastName" />
-
-        <label>Email</label>
-        <InputText @bind-Value="newStudent.Email" />
-
-        <label>Date of birth</label>
-        <InputDate @bind-Value="newStudent.DateOfBirth" />
-
-        <label>Details</label>
-        <InputTextArea @bind-Value="newStudent.Details" />
-
-        <button type="submit">Save student</button>
-    </div>
-</EditForm>
-
-@if (students is null)
+@if (!string.IsNullOrEmpty(accessMessage))
 {
-    <p>Loading students...</p>
-}
-else if (!students.Any())
-{
-    <p>No students yet.</p>
+    <p>@accessMessage</p>
 }
 else
 {
-    @foreach (var student in students)
+    @if (CanCreateStudents)
     {
-        <div class="card">
-            <h3>@student.FirstName @student.LastName</h3>
-            <p><strong>Email:</strong> @student.Email</p>
-            <p><strong>Date of birth:</strong> @student.DateOfBirth</p>
-            <p>@student.Details</p>
-        </div>
+        <EditForm Model="newStudent" OnValidSubmit="CreateStudent">
+            <DataAnnotationsValidator />
+            <div class="card">
+                <label>First name</label>
+                <InputText @bind-Value="newStudent.FirstName" />
+
+                <label>Last name</label>
+                <InputText @bind-Value="newStudent.LastName" />
+
+                <label>Email</label>
+                <InputText @bind-Value="newStudent.Email" />
+
+                <label>Date of birth</label>
+                <InputDate @bind-Value="newStudent.DateOfBirth" />
+
+                <label>Details</label>
+                <InputTextArea @bind-Value="newStudent.Details" />
+
+                <button type="submit">Save student</button>
+            </div>
+        </EditForm>
+    }
+    else if (IsTeacher)
+    {
+        <p class="muted">Showing only students assigned to you.</p>
+    }
+
+    @if (students is null)
+    {
+        <p>Loading students...</p>
+    }
+    else if (!students.Any())
+    {
+        <p>No students yet.</p>
+    }
+    else
+    {
+        @foreach (var student in students)
+        {
+            <div class="card">
+                <h3>@student.FirstName @student.LastName</h3>
+                <p><strong>Email:</strong> @student.Email</p>
+                <p><strong>Date of birth:</strong> @student.DateOfBirth</p>
+                <p>@student.Details</p>
+            </div>
+        }
     }
 }
 
 @code {
     private List<Student>? students;
+    private string? accessMessage;
     private Student newStudent = new()
     {
         DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-10))
@@ -56,11 +72,40 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        if (!Auth.IsAuthenticated)
+        {
+            accessMessage = "Please sign in to view students.";
+            return;
+        }
+
+        if (string.Equals(Auth.Role, "Student", StringComparison.OrdinalIgnoreCase))
+        {
+            accessMessage = "Students can access homework from the Home and Homework pages.";
+            return;
+        }
+
+        if (IsTeacher && Auth.TeacherId.HasValue)
+        {
+            students = await Http.GetFromJsonAsync<List<Student>>($"api/teachers/{Auth.TeacherId.Value}/students") ?? new();
+            return;
+        }
+
+        if (IsTeacher && !Auth.TeacherId.HasValue)
+        {
+            accessMessage = "No teacher profile is linked to this account.";
+            return;
+        }
+
         students = await Http.GetFromJsonAsync<List<Student>>("api/students") ?? new();
     }
 
     private async Task CreateStudent()
     {
+        if (!CanCreateStudents)
+        {
+            return;
+        }
+
         var response = await Http.PostAsJsonAsync("api/students", newStudent);
         if (response.IsSuccessStatusCode)
         {
@@ -76,4 +121,7 @@ else
             }
         }
     }
+
+    private bool CanCreateStudents => string.Equals(Auth.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+    private bool IsTeacher => string.Equals(Auth.Role, "Teacher", StringComparison.OrdinalIgnoreCase);
 }

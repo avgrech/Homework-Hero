@@ -20,30 +20,58 @@
                 <span class="nav-icon" aria-hidden="true">🏠</span>
                 <span>Home</span>
             </NavLink>
-            <NavLink href="/teacher-dashboard" class="nav-link" ActiveClass="active">
-                <span class="nav-icon" aria-hidden="true">📊</span>
-                <span>Teacher dashboard</span>
-            </NavLink>
+            @if (!IsStudent)
+            {
+                <NavLink href="/teacher-dashboard" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">📊</span>
+                    <span>Teacher dashboard</span>
+                </NavLink>
+            }
         </div>
 
         <div class="nav-section">
             <div class="nav-section-title">People & Homework</div>
-            <NavLink href="/students" class="nav-link" ActiveClass="active">
-                <span class="nav-icon" aria-hidden="true">👥</span>
-                <span>Students</span>
-            </NavLink>
-            <NavLink href="/teachers" class="nav-link" ActiveClass="active">
-                <span class="nav-icon" aria-hidden="true">👩‍🏫</span>
-                <span>Teachers</span>
-            </NavLink>
-            <NavLink href="/homework" class="nav-link" ActiveClass="active">
-                <span class="nav-icon" aria-hidden="true">📝</span>
-                <span>Homework</span>
-            </NavLink>
-            <NavLink href="/student-homework" class="nav-link" ActiveClass="active">
-                <span class="nav-icon" aria-hidden="true">📚</span>
-                <span>Student homework</span>
-            </NavLink>
+            @if (IsStudent)
+            {
+                <NavLink href="/student-homework" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">📚</span>
+                    <span>My homework</span>
+                </NavLink>
+            }
+            else if (IsTeacher)
+            {
+                <NavLink href="/students" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">👥</span>
+                    <span>My students</span>
+                </NavLink>
+                <NavLink href="/homework" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">📝</span>
+                    <span>Homework</span>
+                </NavLink>
+                <NavLink href="/student-homework" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">📚</span>
+                    <span>Student homework</span>
+                </NavLink>
+            }
+            else
+            {
+                <NavLink href="/students" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">👥</span>
+                    <span>Students</span>
+                </NavLink>
+                <NavLink href="/teachers" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">👩‍🏫</span>
+                    <span>Teachers</span>
+                </NavLink>
+                <NavLink href="/homework" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">📝</span>
+                    <span>Homework</span>
+                </NavLink>
+                <NavLink href="/student-homework" class="nav-link" ActiveClass="active">
+                    <span class="nav-icon" aria-hidden="true">📚</span>
+                    <span>Student homework</span>
+                </NavLink>
+            }
         </div>
 
         @if (authState.IsAuthenticated && string.Equals(authState.Role, "Admin", StringComparison.OrdinalIgnoreCase))
@@ -77,6 +105,9 @@
 @code {
     [Inject]
     private AuthState authState { get; set; } = default!;
+
+    private bool IsStudent => string.Equals(authState.Role, "Student", StringComparison.OrdinalIgnoreCase);
+    private bool IsTeacher => string.Equals(authState.Role, "Teacher", StringComparison.OrdinalIgnoreCase);
 
     private string UserLabel => authState.IsAuthenticated ? authState.Email : "Guest visitor";
     private string UserRole => authState.IsAuthenticated ? authState.Role : "Not signed in";

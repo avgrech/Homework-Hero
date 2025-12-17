@@ -18,6 +18,8 @@ public class AuthState
     public bool IsAuthenticated { get; private set; }
     public string? Email { get; private set; }
     public string? Role { get; private set; }
+    public int? StudentId { get; private set; }
+    public int? TeacherId { get; private set; }
 
     public event Action? OnChange;
 
@@ -39,14 +41,18 @@ public class AuthState
         IsAuthenticated = true;
         Email = snapshot.Email;
         Role = snapshot.Role;
+        StudentId = snapshot.StudentId;
+        TeacherId = snapshot.TeacherId;
         NotifyStateChanged();
     }
 
-    public async Task SetUserAsync(string email, string role)
+    public async Task SetUserAsync(string email, string role, int? studentId, int? teacherId)
     {
         IsAuthenticated = true;
         Email = email;
         Role = role;
+        StudentId = studentId;
+        TeacherId = teacherId;
 
         await PersistAsync();
         NotifyStateChanged();
@@ -57,6 +63,8 @@ public class AuthState
         IsAuthenticated = false;
         Email = null;
         Role = null;
+        StudentId = null;
+        TeacherId = null;
 
         await jsRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
         NotifyStateChanged();
@@ -69,11 +77,11 @@ public class AuthState
             return;
         }
 
-        var payload = JsonSerializer.Serialize(new AuthSnapshot(Email, Role));
+        var payload = JsonSerializer.Serialize(new AuthSnapshot(Email, Role, StudentId, TeacherId));
         await jsRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, payload);
     }
 
     private void NotifyStateChanged() => OnChange?.Invoke();
 
-    private record AuthSnapshot(string Email, string Role);
+    private record AuthSnapshot(string Email, string Role, int? StudentId, int? TeacherId);
 }

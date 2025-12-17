@@ -87,6 +87,7 @@ students.MapPost("/", async (Student student, HomeworkHeroContext db) =>
 {
     db.Students.Add(student);
     await db.SaveChangesAsync();
+    await EnsureUserForStudentAsync(student, db);
     return Results.Created($"/api/students/{student.Id}", student);
 });
 
@@ -173,6 +174,7 @@ teachers.MapPost("/", async (Teacher teacher, HomeworkHeroContext db) =>
 {
     db.Teachers.Add(teacher);
     await db.SaveChangesAsync();
+    await EnsureUserForTeacherAsync(teacher, db);
     return Results.Created($"/api/teachers/{teacher.Id}", teacher);
 });
 
@@ -226,6 +228,21 @@ teachers.MapGet("/{id:int}/groups", async (int id, HomeworkHeroContext db) =>
         .ToListAsync();
 
     return groups;
+});
+
+teachers.MapGet("/{id:int}/students", async (int id, HomeworkHeroContext db) =>
+{
+    var students = await db.StudentTeachers
+        .Include(st => st.Student)
+        .Where(st => st.TeacherId == id && st.Student != null)
+        .Select(st => st.Student!)
+        .GroupBy(s => s.Id)
+        .Select(g => g.First())
+        .OrderBy(s => s.LastName)
+        .ThenBy(s => s.FirstName)
+        .ToListAsync();
+
+    return students;
 });
 
 teachers.MapGet("/{teacherId:int}/students/{studentId:int}/homework", async (int teacherId, int studentId, HomeworkHeroContext db) =>
@@ -289,6 +306,22 @@ homework.MapGet("/{id:int}", async (int id, HomeworkHeroContext db) =>
         is HomeworkItem item
             ? Results.Ok(item)
             : Results.NotFound());
+homework.MapGet("/student/{studentId:int}", async (int studentId, HomeworkHeroContext db) =>
+{
+    var groupIds = await db.StudentTeachers
+        .Where(st => st.StudentId == studentId)
+        .Select(st => st.GroupId)
+        .Distinct()
+        .ToListAsync();
+
+    var assignedHomework = await db.HomeworkItems
+        .Where(h => h.AssignedStudentId == studentId || (h.AssignedGroupId != null && groupIds.Contains(h.AssignedGroupId)))
+        .ToListAsync();
+
+    return assignedHomework;
+});
+homework.MapGet("/teacher/{teacherId:int}", async (int teacherId, HomeworkHeroContext db) =>
+    await db.HomeworkItems.Where(h => h.TeacherId == teacherId).ToListAsync());
 homework.MapGet("/{id:int}/details/{studentId:int}", async (int id, int studentId, HomeworkHeroContext db) =>
 {
     var item = await db.HomeworkItems
@@ -734,6 +767,9 @@ admin.MapPost("/bulk-import", async (HttpRequest request, HomeworkHeroContext db
     }
 
     await db.SaveChangesAsync();
+    await EnsureUsersForTeachersAsync(db);
+    await EnsureUsersForStudentsAsync(db);
+
     return Results.Ok(new BulkImportResult(teachersCreated, studentsCreated, enrollmentsCreated, errors));
 });
 
@@ -753,7 +789,14 @@ auth.MapPost("/login", async (LoginRequest login, HomeworkHeroContext db) =>
         return Results.Unauthorized();
     }
 
-    return Results.Ok(new LoginResponse(true, user.Role.ToString(), "Authenticated", user.MustResetPassword));
+    return Results.Ok(new LoginResponse(
+        true,
+        user.Role.ToString(),
+        "Authenticated",
+        user.MustResetPassword,
+        user.Email,
+        user.StudentId,
+        user.TeacherId));
 });
 
 auth.MapPost("/reset-password", async (ResetPasswordRequest reset, HomeworkHeroContext db) =>
@@ -782,6 +825,100 @@ auth.MapPost("/reset-password", async (ResetPasswordRequest reset, HomeworkHeroC
 app.MapGet("/api/health", () => Results.Ok("Healthy"));
 
 app.Run();
+
+static async Task EnsureUsersForStudentsAsync(HomeworkHeroContext db)
+{
+    var students = await db.Students.ToListAsync();
+    foreach (var student in students)
+    {
+        await EnsureUserForStudentAsync(student, db);
+    }
+}
+
+static async Task EnsureUsersForTeachersAsync(HomeworkHeroContext db)
+{
+    var teachers = await db.Teachers.ToListAsync();
+    foreach (var teacher in teachers)
+    {
+        await EnsureUserForTeacherAsync(teacher, db);
+    }
+}
+
+static async Task EnsureUserForStudentAsync(Student student, HomeworkHeroContext db)
+{
+    if (student.Id == 0)
+    {
+        return;
+    }
+
+    var normalizedEmail = student.Email.ToLowerInvariant();
+    var existingUser = await db.Users.FirstOrDefaultAsync(u =>
+        u.StudentId == student.Id ||
+        u.Email.ToLower() == normalizedEmail ||
+        u.Username.ToLower() == normalizedEmail);
+
+    if (existingUser is not null)
+    {
+        return;
+    }
+
+    var displayName = $"{student.FirstName} {student.LastName}".Trim();
+    if (string.IsNullOrWhiteSpace(displayName))
+    {
+        displayName = student.Email;
+    }
+
+    db.Users.Add(new User
+    {
+        Username = student.Email,
+        Email = student.Email,
+        DisplayName = displayName,
+        Role = UserRole.Student,
+        PasswordHash = HashPassword("password"),
+        MustResetPassword = true,
+        StudentId = student.Id
+    });
+
+    await db.SaveChangesAsync();
+}
+
+static async Task EnsureUserForTeacherAsync(Teacher teacher, HomeworkHeroContext db)
+{
+    if (teacher.Id == 0)
+    {
+        return;
+    }
+
+    var normalizedEmail = teacher.Email.ToLowerInvariant();
+    var existingUser = await db.Users.FirstOrDefaultAsync(u =>
+        u.TeacherId == teacher.Id ||
+        u.Email.ToLower() == normalizedEmail ||
+        u.Username.ToLower() == normalizedEmail);
+
+    if (existingUser is not null)
+    {
+        return;
+    }
+
+    var displayName = $"{teacher.FirstName} {teacher.LastName}".Trim();
+    if (string.IsNullOrWhiteSpace(displayName))
+    {
+        displayName = teacher.Email;
+    }
+
+    db.Users.Add(new User
+    {
+        Username = teacher.Email,
+        Email = teacher.Email,
+        DisplayName = displayName,
+        Role = UserRole.Teacher,
+        PasswordHash = HashPassword("password"),
+        MustResetPassword = true,
+        TeacherId = teacher.Id
+    });
+
+    await db.SaveChangesAsync();
+}
 
 static string HashPassword(string password)
 {
