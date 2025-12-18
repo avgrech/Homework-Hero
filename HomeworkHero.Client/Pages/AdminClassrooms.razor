@@ -260,7 +260,15 @@ else
         var response = await Http.PostAsJsonAsync("api/admin/classrooms/teacher", teacherAssignment);
         if (response.IsSuccessStatusCode)
         {
-            TeacherStatusMessage = "Teacher added to classroom.";
+            var result = await response.Content.ReadFromJsonAsync<AddTeacherToClassroomResult>();
+            var added = result?.Added ?? 0;
+            var alreadyAssigned = result?.AlreadyAssigned ?? 0;
+
+            TeacherStatusMessage = added > 0 || alreadyAssigned > 0
+                ? $"Teacher added to classroom. Added {added} students; {alreadyAssigned} already assigned."
+                : "Teacher added to classroom.";
+            TeacherIsError = false;
+
             teacherAssignment = new()
             {
                 TeacherId = 0,
@@ -276,5 +284,12 @@ else
         }
 
         IsTeacherSubmitting = false;
+    }
+
+    private class AddTeacherToClassroomResult
+    {
+        public int Added { get; set; }
+
+        public int AlreadyAssigned { get; set; }
     }
 }
