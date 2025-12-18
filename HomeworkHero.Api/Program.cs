@@ -530,15 +530,10 @@ var admin = app.MapGroup("/api/admin");
 admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
 {
     var classrooms = await db.StudentTeachers
-        .Join(db.Teachers,
-            st => st.TeacherId,
-            t => t.Id,
-            (st, t) => new { StudentTeacher = st, Teacher = t })
-        .Join(db.Students,
-            stt => stt.StudentTeacher.StudentId,
-            s => s.Id,
-            (stt, s) => new { stt.StudentTeacher, stt.Teacher, Student = s })
-        .GroupBy(x => new
+        .Include(st => st.Teacher)
+        .Include(st => st.Student)
+        .Where(st => st.Teacher != null && st.Student != null)
+        .GroupBy(st => new
         {
             x.StudentTeacher.GroupId,
             x.StudentTeacher.TeacherId,
@@ -562,14 +557,12 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
         .ToListAsync();
 
     var manualClassrooms = await db.Classrooms
-        .Join(db.Teachers,
-            c => c.TeacherId,
-            t => t.Id,
-            (c, t) => new { Classroom = c, Teacher = t })
-        .Select(x => new ClassroomSummaryDto(
-            x.Classroom.GroupId,
-            x.Classroom.TeacherId,
-            $"{x.Teacher.FirstName} {x.Teacher.LastName}",
+        .Include(c => c.Teacher)
+        .Where(c => c.Teacher != null)
+        .Select(c => new ClassroomSummaryDto(
+            c.GroupId,
+            c.TeacherId,
+            $"{c.Teacher!.FirstName} {c.Teacher.LastName}",
             new List<StudentSummaryDto>()))
         .ToListAsync();
 

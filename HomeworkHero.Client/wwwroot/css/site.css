@@ -367,7 +367,7 @@ button.secondary {
 
 .filter-field.actions {
     display: flex;
-    justify-content: flex-start;
+    justify-content: flex-end;
 }
 
 .homework-grid {
@@ -404,6 +404,7 @@ button.secondary {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .homework-actions .secondary,
@@ -619,7 +620,7 @@ button.secondary {
 }
 
 .chat-input button {
-    justify-self: start;
+    justify-self: end;
 }
 
 .submission-grid {
