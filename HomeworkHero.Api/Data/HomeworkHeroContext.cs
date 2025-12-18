@@ -14,6 +14,7 @@ public class HomeworkHeroContext : DbContext
     public DbSet<Condition> Conditions => Set<Condition>();
     public DbSet<StudentCondition> StudentConditions => Set<StudentCondition>();
     public DbSet<StudentTeacher> StudentTeachers => Set<StudentTeacher>();
+    public DbSet<Classroom> Classrooms => Set<Classroom>();
     public DbSet<HomeworkItem> HomeworkItems => Set<HomeworkItem>();
     public DbSet<StudentAction> StudentActions => Set<StudentAction>();
     public DbSet<StudentPrompt> StudentPrompts => Set<StudentPrompt>();
@@ -52,6 +53,15 @@ public class HomeworkHeroContext : DbContext
             .HasOne(st => st.Teacher)
             .WithMany(t => t.Students)
             .HasForeignKey(st => st.TeacherId);
+
+        modelBuilder.Entity<Classroom>()
+            .HasOne(c => c.Teacher)
+            .WithMany()
+            .HasForeignKey(c => c.TeacherId);
+
+        modelBuilder.Entity<Classroom>()
+            .HasIndex(c => new { c.TeacherId, c.GroupId })
+            .IsUnique();
 
         modelBuilder.Entity<HomeworkItem>()
             .HasOne(h => h.Teacher)

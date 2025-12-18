@@ -554,11 +554,61 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
                 .OrderBy(s => s.LastName)
                 .ThenBy(s => s.FirstName)
                 .ToList()))
-        .OrderBy(c => c.GroupId)
-        .ThenBy(c => c.TeacherName)
         .ToListAsync();
 
-    return classrooms;
+    var manualClassrooms = await db.Classrooms
+        .Include(c => c.Teacher)
+        .Select(c => new ClassroomSummaryDto(
+            c.GroupId,
+            c.TeacherId,
+            $"{c.Teacher!.FirstName} {c.Teacher.LastName}",
+            new List<StudentSummaryDto>()))
+        .ToListAsync();
+
+    var combined = classrooms
+        .Concat(manualClassrooms)
+        .GroupBy(c => new { c.GroupId, c.TeacherId, c.TeacherName })
+        .Select(g => new ClassroomSummaryDto(
+            g.Key.GroupId,
+            g.Key.TeacherId,
+            g.Key.TeacherName,
+            g.SelectMany(x => x.Students).OrderBy(s => s.LastName).ThenBy(s => s.FirstName).ToList()))
+        .OrderBy(c => c.GroupId)
+        .ThenBy(c => c.TeacherName)
+        .ToList();
+
+    return combined;
+});
+
+admin.MapPost("/classrooms", async (CreateClassroomRequest request, HomeworkHeroContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(request.GroupId) || request.TeacherId == 0)
+    {
+        return Results.BadRequest("A teacher and classroom group are required.");
+    }
+
+    var teacher = await db.Teachers.FindAsync(request.TeacherId);
+    if (teacher is null)
+    {
+        return Results.NotFound("Teacher not found");
+    }
+
+    var exists = await db.Classrooms.AnyAsync(c => c.TeacherId == request.TeacherId && c.GroupId == request.GroupId);
+    if (exists)
+    {
+        return Results.Conflict("This classroom already exists.");
+    }
+
+    var classroom = new Classroom
+    {
+        TeacherId = request.TeacherId,
+        GroupId = request.GroupId
+    };
+
+    db.Classrooms.Add(classroom);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/api/admin/classrooms/{classroom.Id}", classroom);
 });
 
 admin.MapPost("/classrooms/assign", async (ClassroomAssignmentRequest request, HomeworkHeroContext db) =>
