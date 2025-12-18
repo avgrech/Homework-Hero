@@ -1,98 +1,114 @@
 @page "/homework-workspace/{Id:int}"
+@page "/homework-workspace"
 @using System.ComponentModel.DataAnnotations
 @inject HttpClient Http
 
 <h1>Homework workspace</h1>
-<p>Review the assignment on the right and use the chat to ask for help as you work.</p>
+<p>Review the assignment, add your work, and use the chat to ask for help as you go.</p>
 
 @if (isLoading)
 {
     <p>Loading homework...</p>
 }
-else if (homework is null)
-{
-    <div class="card">
-        <p>We couldn't find that homework item.</p>
-    </div>
-}
 else
 {
-    <div class="workspace">
-        <div class="workspace-pane chat-pane">
-            <div class="pane-header">
-                <h3>Chat</h3>
-                <p class="muted">Send a question or update for the AI helper.</p>
-            </div>
-            <div class="chat-window">
-                @foreach (var message in messages.OrderBy(m => m.Timestamp))
-                {
-                    <div class="chat-message @(message.IsUser ? "from-user" : "from-helper")">
-                        <div class="chat-meta">
-                            <strong>@message.Sender</strong>
-                            <span>@message.Timestamp.ToLocalTime().ToString("g")</span>
-                        </div>
-                        <p>@message.Content</p>
+    <div class="workspace-grid">
+        <div class="workspace-column">
+            @if (!string.IsNullOrWhiteSpace(loadError))
+            {
+                <div class="card">
+                    <p>@loadError</p>
+                </div>
+            }
+            else if (homework is null)
+            {
+                <div class="card">
+                    <h3>Pick a homework to get started</h3>
+                    <p class="muted">Use the homework list to the left or open a link from your teacher to see the assignment here.</p>
+                </div>
+            }
+            else
+            {
+                <div class="workspace-pane homework-pane">
+                    <div class="pane-header">
+                        <h3>@homework.Title</h3>
+                        <div class="muted">Teacher: @TeacherName(homework) • Date given: @homework.DateAssigned • Due: @homework.DueDate</div>
                     </div>
-                }
-            </div>
-            <EditForm Model="chatInput" OnValidSubmit="SendMessage">
-                <DataAnnotationsValidator />
-                <div class="chat-input">
-                    <InputTextArea @bind-Value="chatInput.Message" placeholder="Ask for help or share your progress" />
-                    <button type="submit">Send</button>
+                    <div class="card">
+                        <p>@homework.TextContent</p>
+                        @if (!string.IsNullOrWhiteSpace(homework.ImageUrl))
+                        {
+                            <p><a href="@homework.ImageUrl" target="_blank">View attached reference</a></p>
+                        }
+                    </div>
                 </div>
-            </EditForm>
-        </div>
-        <div class="workspace-pane homework-pane">
-            <div class="pane-header">
-                <h3>@homework.Title</h3>
-                <div class="muted">Teacher: @TeacherName(homework) • Date given: @homework.DateAssigned • Due: @homework.DueDate</div>
-            </div>
-            <div class="card">
-                <p>@homework.TextContent</p>
-                @if (!string.IsNullOrWhiteSpace(homework.ImageUrl))
-                {
-                    <p><a href="@homework.ImageUrl" target="_blank">View attached reference</a></p>
-                }
-            </div>
-        </div>
-    </div>
 
-    <div class="card submission-card">
-        <h3>Submit homework</h3>
-        <p class="muted">Attach a photo, document, or write your answer below.</p>
-        <EditForm Model="submission" OnValidSubmit="SubmitHomework">
-            <DataAnnotationsValidator />
-            <div class="submission-grid">
-                <div>
-                    <label>Notes or answer</label>
-                    <InputTextArea @bind-Value="submission.Notes" />
-                </div>
-                <div>
-                    <label>Upload a file</label>
-                    <InputFile OnChange="HandleFileSelected" />
-                    @if (!string.IsNullOrWhiteSpace(submission.FileName))
+                <div class="card submission-card">
+                    <h3>Turn in your work</h3>
+                    <p class="muted">Write your response or attach an image/PDF of your work.</p>
+                    <EditForm Model="submission" OnValidSubmit="SubmitHomework">
+                        <DataAnnotationsValidator />
+                        <div class="submission-grid">
+                            <div>
+                                <label>Notes or answer</label>
+                                <InputTextArea @bind-Value="submission.Notes" placeholder="Explain your steps or paste your answer here" />
+                            </div>
+                            <div>
+                                <label>Upload a file</label>
+                                <InputFile OnChange="HandleFileSelected" />
+                                @if (!string.IsNullOrWhiteSpace(submission.FileName))
+                                {
+                                    <p class="muted">Selected: @submission.FileName (@submission.FileSizeKb KB)</p>
+                                }
+                            </div>
+                        </div>
+                        <button type="submit">Submit homework</button>
+                    </EditForm>
+                    @if (!string.IsNullOrWhiteSpace(submissionStatus))
                     {
-                        <p class="muted">Selected: @submission.FileName (@submission.FileSizeKb KB)</p>
+                        <p class="text-success">@submissionStatus</p>
                     }
                 </div>
+            }
+        </div>
+        <div class="workspace-column chat-column">
+            <div class="workspace-pane chat-pane">
+                <div class="pane-header">
+                    <h3>Chat</h3>
+                    <p class="muted">Send a question or update for the AI helper.</p>
+                </div>
+                <div class="chat-window">
+                    @foreach (var message in messages.OrderBy(m => m.Timestamp))
+                    {
+                        <div class="chat-message @(message.IsUser ? "from-user" : "from-helper")">
+                            <div class="chat-meta">
+                                <strong>@message.Sender</strong>
+                                <span>@message.Timestamp.ToLocalTime().ToString("g")</span>
+                            </div>
+                            <p>@message.Content</p>
+                        </div>
+                    }
+                </div>
+                <EditForm Model="chatInput" OnValidSubmit="SendMessage">
+                    <DataAnnotationsValidator />
+                    <div class="chat-input">
+                        <InputTextArea @bind-Value="chatInput.Message" placeholder="Ask for help or share your progress" />
+                        <button type="submit">Send</button>
+                    </div>
+                </EditForm>
             </div>
-            <button type="submit">Submit homework</button>
-        </EditForm>
-        @if (!string.IsNullOrWhiteSpace(submissionStatus))
-        {
-            <p class="text-success">@submissionStatus</p>
-        }
+        </div>
     </div>
 }
 
 @code {
     [Parameter]
-    public int Id { get; set; }
+    public int? Id { get; set; }
 
     private HomeworkItem? homework;
     private List<Teacher> teachers = new();
     private bool isLoading = true;
+    private string loadError = string.Empty;
 
     private List<ChatMessage> messages = new()
     {
@@ -103,9 +119,24 @@ else
     private HomeworkSubmission submission = new();
     private string submissionStatus = string.Empty;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        homework = await Http.GetFromJsonAsync<HomeworkItem>($"api/homework/{Id}");
+        isLoading = true;
+        loadError = string.Empty;
+        homework = null;
+
+        try
+        {
+            if (Id.HasValue && Id.Value > 0)
+            {
+                homework = await Http.GetFromJsonAsync<HomeworkItem>($"api/homework/{Id}");
+            }
+        }
+        catch (HttpRequestException)
+        {
+            loadError = "We couldn't load that homework right now. Please try again later.";
+        }
+
         teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
         isLoading = false;
     }

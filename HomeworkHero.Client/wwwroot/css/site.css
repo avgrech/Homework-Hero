@@ -541,11 +541,23 @@ button.secondary {
     gap: 0.5rem;
 }
 
-.workspace {
+.workspace-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1rem;
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr);
+    gap: 1.25rem;
     align-items: start;
+}
+
+@media (max-width: 960px) {
+    .workspace-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.workspace-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
 .workspace-pane {
@@ -567,20 +579,21 @@ button.secondary {
 
 .chat-window {
     border: 1px solid var(--border-subtle);
-    border-radius: 6px;
-    padding: 0.75rem;
-    min-height: 240px;
-    max-height: 360px;
+    border-radius: 8px;
+    padding: 0.85rem;
+    min-height: 320px;
+    max-height: 520px;
     overflow-y: auto;
-    background: var(--bg-surface-alt);
+    background: linear-gradient(180deg, var(--bg-surface-alt), var(--bg-surface));
 }
 
 .chat-message {
-    border-radius: 6px;
-    padding: 0.5rem 0.6rem;
-    margin-bottom: 0.5rem;
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+    margin-bottom: 0.65rem;
     border: 1px solid var(--border-subtle);
     background: var(--bg-surface);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
 }
 
 .chat-message.from-user {
@@ -603,7 +616,7 @@ button.secondary {
 }
 
 .chat-input textarea {
-    min-height: 80px;
+    min-height: 100px;
 }
 
 .submission-card button {
