@@ -619,14 +619,26 @@ button.secondary {
     min-height: 100px;
 }
 
-.submission-card button {
-    margin-top: 0.75rem;
-}
-
 .submission-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 1rem;
+}
+
+.submission-card button {
+    margin-top: 0.75rem;
+}
+
+.button-compact {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.95rem;
+    border-radius: 9px;
+}
+
+.submission-notes .notes-box {
+    min-height: 220px;
+    width: 100%;
+    resize: vertical;
 }
 
 .table {
