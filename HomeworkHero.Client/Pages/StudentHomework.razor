@@ -48,7 +48,7 @@ else
                 <p class="muted">Teacher: @TeacherName(hw)</p>
                 <p class="muted">Date given: @hw.DateAssigned</p>
                 <p class="muted">Due date: @hw.DueDate</p>
-                <p class="homework-snippet">@hw.TextContent</p>
+                <div class="homework-snippet">@RenderHtml(hw.TextContent)</div>
                 <div class="homework-actions">
                     <button type="button" class="secondary" @onclick="() => SelectHomework(hw)">View</button>
                     <a class="primary" href="@($"/homework-workspace/{hw.Id}")" target="_blank">Do homework</a>
@@ -73,7 +73,7 @@ else
             <p><strong>Student:</strong> @selectedHomework.AssignedStudentId</p>
             @if (!string.IsNullOrWhiteSpace(selectedHomework.TextContent))
             {
-                <p>@selectedHomework.TextContent</p>
+                <div class="homework-content">@RenderHtml(selectedHomework.TextContent)</div>
             }
             @if (!string.IsNullOrWhiteSpace(selectedHomework.ImageUrl))
             {
@@ -197,6 +197,16 @@ else
         return teacher is null
             ? $"Teacher #{hw.TeacherId}"
             : $"{teacher.FirstName} {teacher.LastName}";
+    }
+
+    private MarkupString RenderHtml(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return new MarkupString(string.Empty);
+        }
+
+        return new MarkupString(content);
     }
 
     private void ResetFilters()
