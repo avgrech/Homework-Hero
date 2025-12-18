@@ -10,3 +10,10 @@ public class ClassroomAssignmentRequest
 
     public List<int> StudentIds { get; set; } = new();
 }
+
+public class AddTeacherToClassroomRequest
+{
+    public int TeacherId { get; set; }
+
+    public string GroupId { get; set; } = string.Empty;
+}

@@ -66,6 +66,44 @@ else
     </section>
 
     <section class="card">
+        <h2>Add a teacher to an existing classroom</h2>
+        <p>Assign a second teacher to the students already in a classroom group.</p>
+
+        @if (!string.IsNullOrWhiteSpace(TeacherStatusMessage))
+        {
+            <p class="@(TeacherIsError ? "text-error" : "text-success")">@TeacherStatusMessage</p>
+        }
+
+        <EditForm Model="teacherAssignment" OnValidSubmit="AddTeacherToClassroom">
+            <DataAnnotationsValidator />
+            <div class="grid">
+                <div>
+                    <label>Teacher</label>
+                    <InputSelect @bind-Value="teacherAssignment.TeacherId">
+                        <option value="0">Select a teacher</option>
+                        @foreach (var teacher in teachers)
+                        {
+                            <option value="@teacher.Id">@teacher.FirstName @teacher.LastName (@teacher.Email)</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div>
+                    <label>Classroom / Group ID</label>
+                    <InputSelect @bind-Value="teacherAssignment.GroupId">
+                        <option value="">Select a classroom</option>
+                        @foreach (var group in ClassroomGroups)
+                        {
+                            <option value="@group">@group</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <button type="submit" disabled="@IsTeacherSubmitting">@((IsTeacherSubmitting ? "Adding..." : "Add teacher"))</button>
+        </EditForm>
+    </section>
+
+    <section class="card">
         <h2>Current classrooms</h2>
         @if (classrooms.Count == 0)
         {
@@ -113,9 +151,19 @@ else
         StudentIds = new(),
     };
 
+    private AddTeacherToClassroomRequest teacherAssignment = new()
+    {
+        TeacherId = 0,
+        GroupId = string.Empty
+    };
+
     private string? StatusMessage;
     private bool IsError;
     private bool IsSubmitting;
+
+    private string? TeacherStatusMessage;
+    private bool TeacherIsError;
+    private bool IsTeacherSubmitting;
 
     private bool IsAdmin => Auth.IsAuthenticated && string.Equals(Auth.Role, "Admin", StringComparison.OrdinalIgnoreCase);
 
@@ -125,6 +173,11 @@ else
             s.FirstName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
             s.LastName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
             s.Email.Contains(studentSearch, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<string> ClassroomGroups => classrooms
+        .Select(c => c.GroupId)
+        .Distinct()
+        .OrderBy(g => g);
 
     protected override async Task OnInitializedAsync()
     {
@@ -189,5 +242,39 @@ else
         }
 
         IsSubmitting = false;
+    }
+
+    private async Task AddTeacherToClassroom()
+    {
+        if (teacherAssignment.TeacherId == 0 || string.IsNullOrWhiteSpace(teacherAssignment.GroupId))
+        {
+            TeacherStatusMessage = "Please choose both a teacher and a classroom.";
+            TeacherIsError = true;
+            return;
+        }
+
+        TeacherIsError = false;
+        TeacherStatusMessage = null;
+        IsTeacherSubmitting = true;
+
+        var response = await Http.PostAsJsonAsync("api/admin/classrooms/teacher", teacherAssignment);
+        if (response.IsSuccessStatusCode)
+        {
+            TeacherStatusMessage = "Teacher added to classroom.";
+            teacherAssignment = new()
+            {
+                TeacherId = 0,
+                GroupId = string.Empty
+            };
+            await LoadData();
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            TeacherStatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to add teacher." : error;
+            TeacherIsError = true;
+        }
+
+        IsTeacherSubmitting = false;
     }
 }

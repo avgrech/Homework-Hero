@@ -561,6 +561,58 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
     return classrooms;
 });
 
+admin.MapPost("/classrooms/teacher", async (AddTeacherToClassroomRequest request, HomeworkHeroContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(request.GroupId))
+    {
+        return Results.BadRequest("A classroom group is required.");
+    }
+
+    var teacher = await db.Teachers.FindAsync(request.TeacherId);
+    if (teacher is null)
+    {
+        return Results.NotFound("Teacher not found");
+    }
+
+    var studentsInGroup = await db.StudentTeachers
+        .Where(st => st.GroupId == request.GroupId)
+        .Select(st => st.StudentId)
+        .Distinct()
+        .ToListAsync();
+
+    if (studentsInGroup.Count == 0)
+    {
+        return Results.BadRequest("No students were found in this classroom. Add students first.");
+    }
+
+    var existingAssignments = await db.StudentTeachers
+        .Where(st => st.TeacherId == request.TeacherId && st.GroupId == request.GroupId)
+        .Select(st => st.StudentId)
+        .ToListAsync();
+
+    var studentsToAdd = studentsInGroup.Except(existingAssignments).ToList();
+    var now = DateOnly.FromDateTime(DateTime.UtcNow);
+
+    foreach (var studentId in studentsToAdd)
+    {
+        db.StudentTeachers.Add(new StudentTeacher
+        {
+            StudentId = studentId,
+            TeacherId = request.TeacherId,
+            GroupId = request.GroupId,
+            StartDate = now
+        });
+    }
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        Added = studentsToAdd.Count,
+        AlreadyAssigned = studentsInGroup.Count - studentsToAdd.Count
+    });
+});
+
 admin.MapPost("/classrooms/assign", async (ClassroomAssignmentRequest request, HomeworkHeroContext db) =>
 {
     if (string.IsNullOrWhiteSpace(request.GroupId) || request.StudentIds is null || !request.StudentIds.Any())
