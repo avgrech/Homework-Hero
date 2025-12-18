@@ -530,38 +530,46 @@ var admin = app.MapGroup("/api/admin");
 admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
 {
     var classrooms = await db.StudentTeachers
-        .Include(st => st.Teacher)
-        .Include(st => st.Student)
-        .GroupBy(st => new
+        .Join(db.Teachers,
+            st => st.TeacherId,
+            t => t.Id,
+            (st, t) => new { StudentTeacher = st, Teacher = t })
+        .Join(db.Students,
+            stt => stt.StudentTeacher.StudentId,
+            s => s.Id,
+            (stt, s) => new { stt.StudentTeacher, stt.Teacher, Student = s })
+        .GroupBy(x => new
         {
-            st.GroupId,
-            st.TeacherId,
-            st.Teacher!.FirstName,
-            st.Teacher.LastName
+            x.StudentTeacher.GroupId,
+            x.StudentTeacher.TeacherId,
+            x.Teacher.FirstName,
+            x.Teacher.LastName
         })
         .Select(g => new ClassroomSummaryDto(
             g.Key.GroupId,
             g.Key.TeacherId,
             $"{g.Key.FirstName} {g.Key.LastName}",
-            g.Where(st => st.Student != null)
-                .Select(st => new StudentSummaryDto
-                {
-                    Id = st.StudentId,
-                    FirstName = st.Student!.FirstName,
-                    LastName = st.Student.LastName,
-                    IsChatBlocked = st.Student.IsChatBlocked
-                })
-                .OrderBy(s => s.LastName)
-                .ThenBy(s => s.FirstName)
-                .ToList()))
+            g.Select(x => new StudentSummaryDto
+            {
+                Id = x.StudentTeacher.StudentId,
+                FirstName = x.Student.FirstName,
+                LastName = x.Student.LastName,
+                IsChatBlocked = x.Student.IsChatBlocked
+            })
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
+            .ToList()))
         .ToListAsync();
 
     var manualClassrooms = await db.Classrooms
-        .Include(c => c.Teacher)
-        .Select(c => new ClassroomSummaryDto(
-            c.GroupId,
-            c.TeacherId,
-            $"{c.Teacher!.FirstName} {c.Teacher.LastName}",
+        .Join(db.Teachers,
+            c => c.TeacherId,
+            t => t.Id,
+            (c, t) => new { Classroom = c, Teacher = t })
+        .Select(x => new ClassroomSummaryDto(
+            x.Classroom.GroupId,
+            x.Classroom.TeacherId,
+            $"{x.Teacher.FirstName} {x.Teacher.LastName}",
             new List<StudentSummaryDto>()))
         .ToListAsync();
 
