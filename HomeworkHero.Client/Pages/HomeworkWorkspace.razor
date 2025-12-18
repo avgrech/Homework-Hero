@@ -1,7 +1,8 @@
-@page "/homework-workspace/{Id:int}"
+@page "/homework-workspace/{HomeworkId:int}"
 @page "/homework-workspace"
 @using System.ComponentModel.DataAnnotations
 @inject HttpClient Http
+@attribute [SupplyParameterFromQuery(Name = "homeworkId")]
 
 <h1>Homework workspace</h1>
 <p>Review the assignment, add your work, and use the chat to ask for help as you go.</p>
@@ -103,7 +104,7 @@ else
 
 @code {
     [Parameter]
-    public int? Id { get; set; }
+    public int? HomeworkId { get; set; }
 
     private HomeworkItem? homework;
     private List<Teacher> teachers = new();
@@ -127,18 +128,25 @@ else
 
         try
         {
-            if (Id.HasValue && Id.Value > 0)
+            if (HomeworkId.HasValue && HomeworkId.Value > 0)
             {
-                homework = await Http.GetFromJsonAsync<HomeworkItem>($"api/homework/{Id}");
+                homework = await Http.GetFromJsonAsync<HomeworkItem>($"api/homework/{HomeworkId}");
             }
+            else
+            {
+                loadError = "Pick a homework from the list to get started.";
+            }
+
+            teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
         }
         catch (HttpRequestException)
         {
             loadError = "We couldn't load that homework right now. Please try again later.";
         }
-
-        teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
-        isLoading = false;
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private string TeacherName(HomeworkItem hw)
