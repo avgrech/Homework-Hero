@@ -149,7 +149,7 @@ else
             <p><strong>Student:</strong> @hw.AssignedStudentId</p>
             <p><strong>Date given:</strong> @hw.DateAssigned</p>
             <p><strong>Due date:</strong> @hw.DueDate</p>
-            <p>@hw.TextContent</p>
+            <div class="homework-content">@RenderHtml(hw.TextContent)</div>
             @if (!string.IsNullOrWhiteSpace(hw.ImageUrl))
             {
                 <p><a href="@hw.ImageUrl" target="_blank">View image</a></p>
@@ -474,4 +474,14 @@ else
     private bool IsTeacher => string.Equals(Auth.Role, "Teacher", StringComparison.OrdinalIgnoreCase);
     private bool IsStudent => string.Equals(Auth.Role, "Student", StringComparison.OrdinalIgnoreCase);
     private bool CanCreateHomework => !IsStudent && (!IsTeacher || Auth.TeacherId.HasValue);
+
+    private MarkupString RenderHtml(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return new MarkupString(string.Empty);
+        }
+
+        return new MarkupString(content);
+    }
 }
