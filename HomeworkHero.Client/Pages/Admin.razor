@@ -86,12 +86,32 @@ else
             <DataAnnotationsValidator />
             <div class="grid">
                 <div>
-                    <label>Student ID</label>
-                    <InputNumber @bind-Value="enrollment.StudentId" />
+                    <label>Student</label>
+                    <InputText class="text-input" @bind-Value="studentSearch" list="student-options" placeholder="Search students by name or email" @oninput="OnStudentInput" />
+                    <datalist id="student-options">
+                        @foreach (var student in FilteredStudents)
+                        {
+                            <option value="@StudentLabel(student)"></option>
+                        }
+                    </datalist>
+                    @if (enrollment.StudentId == 0)
+                    {
+                        <p class="muted small">Select a student from the list.</p>
+                    }
                 </div>
                 <div>
-                    <label>Teacher ID</label>
-                    <InputNumber @bind-Value="enrollment.TeacherId" />
+                    <label>Teacher</label>
+                    <InputText class="text-input" @bind-Value="teacherSearch" list="teacher-options" placeholder="Search teachers by name or email" @oninput="OnTeacherInput" />
+                    <datalist id="teacher-options">
+                        @foreach (var teacher in FilteredTeachers)
+                        {
+                            <option value="@TeacherLabel(teacher)"></option>
+                        }
+                    </datalist>
+                    @if (enrollment.TeacherId == 0)
+                    {
+                        <p class="muted small">Select a teacher from the list.</p>
+                    }
                 </div>
                 <div>
                     <label>Group ID</label>
@@ -151,7 +171,8 @@ else
 @code {
     private IBrowserFile? uploadFile;
     private BulkImportResult? importResult;
-    private List<Student>? students;
+    private List<Student> students = new();
+    private List<Teacher> teachers = new();
     private Student newStudent = new()
     {
         DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-10))
@@ -162,17 +183,39 @@ else
         GroupId = "Default",
         StartDate = DateOnly.FromDateTime(DateTime.UtcNow)
     };
+    private string studentSearch = string.Empty;
+    private string teacherSearch = string.Empty;
 
     private bool IsAdmin => Auth.IsAuthenticated && string.Equals(Auth.Role, "Admin", StringComparison.OrdinalIgnoreCase);
 
+    private IEnumerable<Student> FilteredStudents => string.IsNullOrWhiteSpace(studentSearch)
+        ? students
+        : students.Where(s =>
+            s.FirstName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
+            s.LastName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
+            s.Email.Contains(studentSearch, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<Teacher> FilteredTeachers => string.IsNullOrWhiteSpace(teacherSearch)
+        ? teachers
+        : teachers.Where(t =>
+            t.FirstName.Contains(teacherSearch, StringComparison.OrdinalIgnoreCase) ||
+            t.LastName.Contains(teacherSearch, StringComparison.OrdinalIgnoreCase) ||
+            t.Email.Contains(teacherSearch, StringComparison.OrdinalIgnoreCase));
+
     protected override async Task OnInitializedAsync()
     {
-        await LoadStudents();
+        await LoadData();
     }
 
-    private async Task LoadStudents()
+    private async Task LoadData()
     {
-        students = await Http.GetFromJsonAsync<List<Student>>("api/students") ?? new();
+        var studentsTask = Http.GetFromJsonAsync<List<Student>>("api/students");
+        var teachersTask = Http.GetFromJsonAsync<List<Teacher>>("api/teachers");
+
+        await Task.WhenAll(studentsTask, teachersTask);
+
+        students = studentsTask.Result ?? new();
+        teachers = teachersTask.Result ?? new();
     }
 
     private void OnFileSelected(InputFileChangeEventArgs e)
@@ -195,9 +238,27 @@ else
         if (response.IsSuccessStatusCode)
         {
             importResult = await response.Content.ReadFromJsonAsync<BulkImportResult>();
-            await LoadStudents();
+            await LoadData();
         }
     }
+
+    private void OnStudentInput(ChangeEventArgs e)
+    {
+        studentSearch = e.Value?.ToString() ?? string.Empty;
+        var match = students.FirstOrDefault(s => string.Equals(StudentLabel(s), studentSearch, StringComparison.OrdinalIgnoreCase));
+        enrollment.StudentId = match?.Id ?? 0;
+    }
+
+    private void OnTeacherInput(ChangeEventArgs e)
+    {
+        teacherSearch = e.Value?.ToString() ?? string.Empty;
+        var match = teachers.FirstOrDefault(t => string.Equals(TeacherLabel(t), teacherSearch, StringComparison.OrdinalIgnoreCase));
+        enrollment.TeacherId = match?.Id ?? 0;
+    }
+
+    private static string StudentLabel(Student student) => $"{student.FirstName} {student.LastName} ({student.Email})";
+
+    private static string TeacherLabel(Teacher teacher) => $"{teacher.FirstName} {teacher.LastName} ({teacher.Email})";
 
     private async Task CreateStudent()
     {
@@ -225,8 +286,13 @@ else
 
     private async Task CreateEnrollment()
     {
+        if (enrollment.StudentId == 0 || enrollment.TeacherId == 0)
+        {
+            return;
+        }
+
         await Http.PostAsJsonAsync($"api/students/{enrollment.StudentId}/teachers", enrollment);
-        await LoadStudents();
+        await LoadData();
     }
 
     private async Task ToggleStudentChat(Student student)
