@@ -535,26 +535,25 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
         .Where(st => st.Teacher != null && st.Student != null)
         .GroupBy(st => new
         {
-            st.GroupId,
-            st.TeacherId,
-            st.Teacher!.FirstName,
-            st.Teacher.LastName
+            x.StudentTeacher.GroupId,
+            x.StudentTeacher.TeacherId,
+            x.Teacher.FirstName,
+            x.Teacher.LastName
         })
         .Select(g => new ClassroomSummaryDto(
             g.Key.GroupId,
             g.Key.TeacherId,
             $"{g.Key.FirstName} {g.Key.LastName}",
-            g.Where(st => st.Student != null)
-                .Select(st => new StudentSummaryDto
-                {
-                    Id = st.StudentId,
-                    FirstName = st.Student!.FirstName,
-                    LastName = st.Student.LastName,
-                    IsChatBlocked = st.Student.IsChatBlocked
-                })
-                .OrderBy(s => s.LastName)
-                .ThenBy(s => s.FirstName)
-                .ToList()))
+            g.Select(x => new StudentSummaryDto
+            {
+                Id = x.StudentTeacher.StudentId,
+                FirstName = x.Student.FirstName,
+                LastName = x.Student.LastName,
+                IsChatBlocked = x.Student.IsChatBlocked
+            })
+            .OrderBy(s => s.LastName)
+            .ThenBy(s => s.FirstName)
+            .ToList()))
         .ToListAsync();
 
     var manualClassrooms = await db.Classrooms
