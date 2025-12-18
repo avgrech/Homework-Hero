@@ -610,13 +610,16 @@ button.secondary {
 
 .chat-input {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
     gap: 0.5rem;
-    align-items: center;
 }
 
 .chat-input textarea {
     min-height: 100px;
+}
+
+.chat-input button {
+    justify-self: start;
 }
 
 .submission-grid {
