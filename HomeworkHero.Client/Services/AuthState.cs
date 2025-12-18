@@ -25,25 +25,36 @@ public class AuthState
 
     public async Task InitializeAsync()
     {
-        var storedValue = await jsRuntime.InvokeAsync<string?>("localStorage.getItem", StorageKey);
-        if (string.IsNullOrWhiteSpace(storedValue))
+        try
         {
-            return;
-        }
+            var storedValue = await jsRuntime.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+            if (string.IsNullOrWhiteSpace(storedValue))
+            {
+                return;
+            }
 
-        var snapshot = JsonSerializer.Deserialize<AuthSnapshot>(storedValue);
-        if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.Email) || string.IsNullOrWhiteSpace(snapshot.Role))
+            var snapshot = JsonSerializer.Deserialize<AuthSnapshot>(storedValue);
+            if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.Email) || string.IsNullOrWhiteSpace(snapshot.Role))
+            {
+                await jsRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
+                return;
+            }
+
+            IsAuthenticated = true;
+            Email = snapshot.Email;
+            Role = snapshot.Role;
+            StudentId = snapshot.StudentId;
+            TeacherId = snapshot.TeacherId;
+            NotifyStateChanged();
+        }
+        catch (JSException)
         {
-            await jsRuntime.InvokeVoidAsync("localStorage.removeItem", StorageKey);
-            return;
+            // JS interop may fail before the app bootstraps; treat as not authenticated.
         }
-
-        IsAuthenticated = true;
-        Email = snapshot.Email;
-        Role = snapshot.Role;
-        StudentId = snapshot.StudentId;
-        TeacherId = snapshot.TeacherId;
-        NotifyStateChanged();
+        catch (InvalidOperationException)
+        {
+            // If JS isn't ready yet, skip initialization so the app can continue loading.
+        }
     }
 
     public async Task SetUserAsync(string email, string role, int? studentId, int? teacherId)
