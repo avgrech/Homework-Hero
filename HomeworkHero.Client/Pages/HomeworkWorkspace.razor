@@ -35,7 +35,7 @@ else
                         <div class="muted">Teacher: @TeacherName(homework) • Date given: @homework.DateAssigned • Due: @homework.DueDate</div>
                     </div>
                     <div class="card">
-                        <p>@homework.TextContent</p>
+                        <div class="homework-content">@RenderHtml(homework.TextContent)</div>
                         @if (!string.IsNullOrWhiteSpace(homework.ImageUrl))
                         {
                             <p><a href="@homework.ImageUrl" target="_blank">View attached reference</a></p>
@@ -193,6 +193,16 @@ else
     {
         submissionStatus = "Submission saved. We'll send it to your teacher.";
         return Task.CompletedTask;
+    }
+
+    private MarkupString RenderHtml(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return new MarkupString(string.Empty);
+        }
+
+        return new MarkupString(content);
     }
 
     private record ChatMessage(string Sender, string Content, DateTime Timestamp, bool IsUser = false)
