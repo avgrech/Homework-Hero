@@ -535,10 +535,10 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
         .Where(st => st.Teacher != null && st.Student != null)
         .GroupBy(st => new
         {
-            x.StudentTeacher.GroupId,
-            x.StudentTeacher.TeacherId,
-            x.Teacher.FirstName,
-            x.Teacher.LastName
+            st.StudentTeacher.GroupId,
+            st.StudentTeacher.TeacherId,
+            st.Teacher.FirstName,
+            st.Teacher.LastName
         })
         .Select(g => new ClassroomSummaryDto(
             g.Key.GroupId,
