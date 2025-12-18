@@ -45,13 +45,13 @@ else
 
                 <div class="card submission-card">
                     <h3>Turn in your work</h3>
-                    <p class="muted">Write your response or attach an image/PDF of your work.</p>
+                    <p class="muted">Share a clear response with any supporting files so your teacher can follow your thinking.</p>
                     <EditForm Model="submission" OnValidSubmit="SubmitHomework">
                         <DataAnnotationsValidator />
                         <div class="submission-grid">
-                            <div>
+                            <div class="submission-notes">
                                 <label>Notes or answer</label>
-                                <InputTextArea @bind-Value="submission.Notes" placeholder="Explain your steps or paste your answer here" />
+                                <InputTextArea @bind-Value="submission.Notes" class="notes-box" placeholder="Explain your steps or paste your answer here" />
                             </div>
                             <div>
                                 <label>Upload a file</label>
@@ -62,7 +62,7 @@ else
                                 }
                             </div>
                         </div>
-                        <button type="submit">Submit homework</button>
+                        <button type="submit" class="button-compact">Submit homework</button>
                     </EditForm>
                     @if (!string.IsNullOrWhiteSpace(submissionStatus))
                     {
