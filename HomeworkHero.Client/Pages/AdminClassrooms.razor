@@ -26,9 +26,10 @@ else
             <div class="grid">
                 <div>
                     <label>Teacher</label>
+                    <InputText @bind-Value="teacherSearch" placeholder="Search teachers" oninput="oninput" />
                     <InputSelect @bind-Value="assignment.TeacherId">
                         <option value="0">Select a teacher</option>
-                        @foreach (var teacher in teachers)
+                        @foreach (var teacher in FilteredTeachers)
                         {
                             <option value="@teacher.Id">@teacher.FirstName @teacher.LastName (@teacher.Email)</option>
                         }
@@ -110,19 +111,20 @@ else
         <div class="grid">
             <div>
                 <label>Classroom / Group ID</label>
-                <InputSelect @bind-Value="selectedClassroomGroup">
-                    <option value="">Select a classroom</option>
-                    @foreach (var group in classrooms.Select(c => c.GroupId).Distinct())
+                <InputText @bind-Value="selectedClassroomGroup" list="classroom-options" @bind-Value:event="oninput" placeholder="Search classrooms" />
+                <datalist id="classroom-options">
+                    @foreach (var group in ClassroomGroups)
                     {
-                        <option value="@group">@group</option>
+                        <option value="@group"></option>
                     }
-                </InputSelect>
+                </datalist>
             </div>
             <div>
                 <label>Teacher</label>
+                <InputText @bind-Value="teacherSearch" placeholder="Search teachers" oninput="oninput" />
                 <InputSelect @bind-Value="selectedTeacherId">
                     <option value="0">Select a teacher</option>
-                    @foreach (var teacher in teachers)
+                    @foreach (var teacher in FilteredTeachers)
                     {
                         <option value="@teacher.Id">@teacher.FirstName @teacher.LastName (@teacher.Email)</option>
                     }
@@ -141,6 +143,7 @@ else
     private List<Student> students = new();
     private List<ClassroomSummaryDto> classrooms = new();
     private string studentSearch = string.Empty;
+    private string teacherSearch = string.Empty;
     private ClassroomAssignmentRequest assignment = new()
     {
         TeacherId = 0,
@@ -163,6 +166,19 @@ else
             s.FirstName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
             s.LastName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
             s.Email.Contains(studentSearch, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<Teacher> FilteredTeachers => string.IsNullOrWhiteSpace(teacherSearch)
+        ? teachers
+        : teachers.Where(t =>
+            t.FirstName.Contains(teacherSearch, StringComparison.OrdinalIgnoreCase) ||
+            t.LastName.Contains(teacherSearch, StringComparison.OrdinalIgnoreCase) ||
+            t.Email.Contains(teacherSearch, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<string> ClassroomGroups => classrooms
+        .Select(c => c.GroupId)
+        .Where(group => !string.IsNullOrWhiteSpace(group))
+        .Distinct()
+        .OrderBy(group => group);
 
     protected override async Task OnInitializedAsync()
     {
