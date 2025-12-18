@@ -61,7 +61,10 @@ else
                 </div>
             </div>
 
-            <button type="submit" disabled="@IsSubmitting">@((IsSubmitting ? "Saving..." : "Save classroom"))</button>
+            <div class="button-row">
+                <button type="submit" disabled="@IsSubmitting">@((IsSubmitting ? "Saving..." : "Save classroom"))</button>
+                <button type="button" @onclick="CreateClassroom" disabled="@IsSubmitting">Create classroom</button>
+            </div>
         </EditForm>
     </section>
 
@@ -185,6 +188,41 @@ else
         {
             var error = await response.Content.ReadAsStringAsync();
             StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to save classroom." : error;
+            IsError = true;
+        }
+
+        IsSubmitting = false;
+    }
+
+    private async Task CreateClassroom()
+    {
+        if (assignment.TeacherId == 0 || string.IsNullOrWhiteSpace(assignment.GroupId))
+        {
+            StatusMessage = "Please choose a teacher and classroom name.";
+            IsError = true;
+            return;
+        }
+
+        IsSubmitting = true;
+        IsError = false;
+        StatusMessage = null;
+
+        var request = new CreateClassroomRequest
+        {
+            TeacherId = assignment.TeacherId,
+            GroupId = assignment.GroupId
+        };
+
+        var response = await Http.PostAsJsonAsync("api/admin/classrooms", request);
+        if (response.IsSuccessStatusCode)
+        {
+            StatusMessage = "Classroom created.";
+            await LoadData();
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to create classroom." : error;
             IsError = true;
         }
 

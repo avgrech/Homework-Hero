@@ -90,6 +90,17 @@ public class StudentTeacher
     public DateOnly? EndDate { get; set; }
 }
 
+public class Classroom
+{
+    public int Id { get; set; }
+
+    [MaxLength(50)]
+    public string GroupId { get; set; } = string.Empty;
+
+    public int TeacherId { get; set; }
+    public Teacher? Teacher { get; set; }
+}
+
 public class HomeworkItem
 {
     public int Id { get; set; }
