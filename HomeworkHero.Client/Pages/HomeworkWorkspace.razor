@@ -48,21 +48,23 @@ else
                     <p class="muted">Share a clear response with any supporting files so your teacher can follow your thinking.</p>
                     <EditForm Model="submission" OnValidSubmit="SubmitHomework">
                         <DataAnnotationsValidator />
-                        <div class="submission-grid">
+                        <div >
                             <div class="submission-notes">
                                 <label>Notes or answer</label>
                                 <InputTextArea @bind-Value="submission.Notes" class="notes-box" placeholder="Explain your steps or paste your answer here" />
                             </div>
-                            <div>
+                            <div class="submission-notes">
                                 <label>Upload a file</label>
                                 <InputFile OnChange="HandleFileSelected" />
                                 @if (!string.IsNullOrWhiteSpace(submission.FileName))
                                 {
                                     <p class="muted">Selected: @submission.FileName (@submission.FileSizeKb KB)</p>
                                 }
+
+                                <button type="submit" class="button-compact">Submit homework</button>
                             </div>
                         </div>
-                        <button type="submit" class="button-compact">Submit homework</button>
+                        
                     </EditForm>
                     @if (!string.IsNullOrWhiteSpace(submissionStatus))
                     {
