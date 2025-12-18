@@ -102,6 +102,38 @@ else
             </div>
         }
     </section>
+
+    <section class="card">
+        <h2>Add a teacher to an existing classroom</h2>
+        <p>Pair another teacher with a classroom without changing student assignments.</p>
+
+        <div class="grid">
+            <div>
+                <label>Classroom / Group ID</label>
+                <InputSelect @bind-Value="selectedClassroomGroup">
+                    <option value="">Select a classroom</option>
+                    @foreach (var group in classrooms.Select(c => c.GroupId).Distinct())
+                    {
+                        <option value="@group">@group</option>
+                    }
+                </InputSelect>
+            </div>
+            <div>
+                <label>Teacher</label>
+                <InputSelect @bind-Value="selectedTeacherId">
+                    <option value="0">Select a teacher</option>
+                    @foreach (var teacher in teachers)
+                    {
+                        <option value="@teacher.Id">@teacher.FirstName @teacher.LastName (@teacher.Email)</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <button type="button" @onclick="AddTeacherToClassroom" disabled="@IsSubmitting">Add teacher</button>
+        </div>
+    </section>
 }
 
 @code {
@@ -115,6 +147,9 @@ else
         GroupId = string.Empty,
         StudentIds = new(),
     };
+
+    private int selectedTeacherId;
+    private string selectedClassroomGroup = string.Empty;
 
     private string? StatusMessage;
     private bool IsError;
@@ -231,6 +266,43 @@ else
         {
             var error = await response.Content.ReadAsStringAsync();
             StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to create classroom." : error;
+            IsError = true;
+        }
+
+        IsSubmitting = false;
+    }
+
+    private async Task AddTeacherToClassroom()
+    {
+        if (selectedTeacherId == 0 || string.IsNullOrWhiteSpace(selectedClassroomGroup))
+        {
+            StatusMessage = "Please choose a classroom and teacher.";
+            IsError = true;
+            return;
+        }
+
+        IsSubmitting = true;
+        IsError = false;
+        StatusMessage = null;
+
+        var request = new CreateClassroomRequest
+        {
+            TeacherId = selectedTeacherId,
+            GroupId = selectedClassroomGroup
+        };
+
+        var response = await Http.PostAsJsonAsync("api/admin/classrooms", request);
+        if (response.IsSuccessStatusCode)
+        {
+            StatusMessage = "Teacher added to classroom.";
+            await LoadData();
+            selectedClassroomGroup = string.Empty;
+            selectedTeacherId = 0;
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to add teacher to classroom." : error;
             IsError = true;
         }
 
