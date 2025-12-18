@@ -630,9 +630,9 @@ button.secondary {
 }
 
 .button-compact {
-    padding: 0.45rem 0.9rem;
-    font-size: 0.95rem;
-    border-radius: 9px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.9rem;
+    border-radius: 8px;
 }
 
 .submission-notes .notes-box {
