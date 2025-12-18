@@ -54,7 +54,10 @@ else
                     @foreach (var student in FilteredStudents)
                     {
                         <label>
-                            <input type="checkbox" @checked="assignment.StudentIds.Contains(student.Id)" @onchange="() => ToggleStudent(student.Id)" />
+                            <input
+                                type="checkbox"
+                                @checked="assignment.StudentIds.Contains(student.Id)"
+                                @onchange="() => ToggleStudent(student.Id)" />
                             @student.FirstName @student.LastName (@student.Email)
                         </label>
                     }
