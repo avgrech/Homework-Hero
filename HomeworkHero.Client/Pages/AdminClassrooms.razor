@@ -171,9 +171,9 @@ else
 
     private async Task LoadData()
     {
-        teachers = await FetchOrEmpty("api/teachers") ?? new();
-        students = await FetchOrEmpty("api/students") ?? new();
-        classrooms = await FetchOrEmpty("api/admin/classrooms") ?? new();
+        teachers = await FetchOrEmpty<Teacher>("api/teachers") ?? new();
+        students = await FetchOrEmpty<Student>("api/students") ?? new();
+        classrooms = await FetchOrEmpty<ClassroomSummaryDto>("api/admin/classrooms") ?? new();
     }
 
     private async Task<List<T>?> FetchOrEmpty<T>(string requestUri)
