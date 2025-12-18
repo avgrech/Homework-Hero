@@ -133,15 +133,23 @@ else
 
     private async Task LoadData()
     {
-        var teachersTask = Http.GetFromJsonAsync<List<Teacher>>("api/teachers");
-        var studentsTask = Http.GetFromJsonAsync<List<Student>>("api/students");
-        var classroomsTask = Http.GetFromJsonAsync<List<ClassroomSummaryDto>>("api/admin/classrooms");
+        teachers = await FetchOrEmpty("api/teachers") ?? new();
+        students = await FetchOrEmpty("api/students") ?? new();
+        classrooms = await FetchOrEmpty("api/admin/classrooms") ?? new();
+    }
 
-        await Task.WhenAll(teachersTask, studentsTask, classroomsTask);
-
-        teachers = teachersTask.Result ?? new();
-        students = studentsTask.Result ?? new();
-        classrooms = classroomsTask.Result ?? new();
+    private async Task<List<T>?> FetchOrEmpty<T>(string requestUri)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<List<T>>(requestUri) ?? new();
+        }
+        catch
+        {
+            StatusMessage = $"Unable to load data from '{requestUri}'.";
+            IsError = true;
+            return new();
+        }
     }
 
     private void ToggleStudent(int studentId)
