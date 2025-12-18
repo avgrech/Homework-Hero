@@ -535,8 +535,8 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
         .Where(st => st.Teacher != null && st.Student != null)
         .GroupBy(st => new
         {
-            st.StudentTeacher.GroupId,
-            st.StudentTeacher.TeacherId,
+            st.GroupId,
+            st.TeacherId,
             st.Teacher.FirstName,
             st.Teacher.LastName
         })
@@ -546,7 +546,7 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
             $"{g.Key.FirstName} {g.Key.LastName}",
             g.Select(x => new StudentSummaryDto
             {
-                Id = x.StudentTeacher.StudentId,
+                Id = x.StudentId,
                 FirstName = x.Student.FirstName,
                 LastName = x.Student.LastName,
                 IsChatBlocked = x.Student.IsChatBlocked
