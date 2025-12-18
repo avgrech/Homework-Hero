@@ -532,6 +532,7 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
     var classrooms = await db.StudentTeachers
         .Include(st => st.Teacher)
         .Include(st => st.Student)
+        .Where(st => st.Teacher != null && st.Student != null)
         .GroupBy(st => new
         {
             st.GroupId,
@@ -558,6 +559,7 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
 
     var manualClassrooms = await db.Classrooms
         .Include(c => c.Teacher)
+        .Where(c => c.Teacher != null)
         .Select(c => new ClassroomSummaryDto(
             c.GroupId,
             c.TeacherId,
