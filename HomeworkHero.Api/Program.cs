@@ -561,7 +561,7 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
         .Select(c => new ClassroomSummaryDto(
             c.GroupId,
             c.TeacherId,
-            c.Teacher is null ? "Unassigned" : $"{c.Teacher.FirstName} {c.Teacher.LastName}",
+            c.Teacher == null ? "Unassigned" : $"{c.Teacher.FirstName} {c.Teacher.LastName}",
             new List<StudentSummaryDto>()))
         .ToListAsync();
 
