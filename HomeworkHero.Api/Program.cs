@@ -558,11 +558,10 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
 
     var manualClassrooms = await db.Classrooms
         .Include(c => c.Teacher)
-        .Where(c => c.Teacher != null)
         .Select(c => new ClassroomSummaryDto(
             c.GroupId,
             c.TeacherId,
-            $"{c.Teacher!.FirstName} {c.Teacher.LastName}",
+            c.Teacher is null ? "Unassigned" : $"{c.Teacher.FirstName} {c.Teacher.LastName}",
             new List<StudentSummaryDto>()))
         .ToListAsync();
 
@@ -583,26 +582,43 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
 
 admin.MapPost("/classrooms", async (CreateClassroomRequest request, HomeworkHeroContext db) =>
 {
-    if (string.IsNullOrWhiteSpace(request.GroupId) || request.TeacherId == 0)
+    if (string.IsNullOrWhiteSpace(request.GroupId))
     {
-        return Results.BadRequest("A teacher and classroom group are required.");
+        return Results.BadRequest("A classroom name is required.");
     }
 
-    var teacher = await db.Teachers.FindAsync(request.TeacherId);
-    if (teacher is null)
+    var classroom = await db.Classrooms.FirstOrDefaultAsync(c => c.GroupId == request.GroupId);
+
+    Teacher? teacher = null;
+    if (request.TeacherId.HasValue && request.TeacherId != 0)
     {
-        return Results.NotFound("Teacher not found");
+        teacher = await db.Teachers.FindAsync(request.TeacherId.Value);
+        if (teacher is null)
+        {
+            return Results.NotFound("Teacher not found");
+        }
     }
 
-    var exists = await db.Classrooms.AnyAsync(c => c.TeacherId == request.TeacherId && c.GroupId == request.GroupId);
-    if (exists)
+    if (classroom is not null)
     {
-        return Results.Conflict("This classroom already exists.");
+        if (teacher is null)
+        {
+            return Results.Conflict("This classroom already exists.");
+        }
+
+        if (classroom.TeacherId == teacher.Id)
+        {
+            return Results.Ok(classroom);
+        }
+
+        classroom.TeacherId = teacher.Id;
+        await db.SaveChangesAsync();
+        return Results.Ok(classroom);
     }
 
-    var classroom = new Classroom
+    classroom = new Classroom
     {
-        TeacherId = request.TeacherId,
+        TeacherId = teacher?.Id,
         GroupId = request.GroupId
     };
 
