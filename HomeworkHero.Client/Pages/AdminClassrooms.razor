@@ -260,9 +260,9 @@ else
 
     private async Task CreateClassroom()
     {
-        if (assignment.TeacherId == 0 || string.IsNullOrWhiteSpace(assignment.GroupId))
+        if (string.IsNullOrWhiteSpace(assignment.GroupId))
         {
-            StatusMessage = "Please choose a teacher and classroom name.";
+            StatusMessage = "Please enter a classroom name.";
             IsError = true;
             return;
         }
@@ -273,7 +273,6 @@ else
 
         var request = new CreateClassroomRequest
         {
-            TeacherId = assignment.TeacherId,
             GroupId = assignment.GroupId
         };
 

@@ -97,7 +97,7 @@ public class Classroom
     [MaxLength(50)]
     public string GroupId { get; set; } = string.Empty;
 
-    public int TeacherId { get; set; }
+    public int? TeacherId { get; set; }
     public Teacher? Teacher { get; set; }
 }
 

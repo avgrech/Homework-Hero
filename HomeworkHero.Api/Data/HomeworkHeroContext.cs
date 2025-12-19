@@ -57,10 +57,11 @@ public class HomeworkHeroContext : DbContext
         modelBuilder.Entity<Classroom>()
             .HasOne(c => c.Teacher)
             .WithMany()
-            .HasForeignKey(c => c.TeacherId);
+            .HasForeignKey(c => c.TeacherId)
+            .IsRequired(false);
 
         modelBuilder.Entity<Classroom>()
-            .HasIndex(c => new { c.TeacherId, c.GroupId })
+            .HasIndex(c => c.GroupId)
             .IsUnique();
 
         modelBuilder.Entity<HomeworkItem>()
