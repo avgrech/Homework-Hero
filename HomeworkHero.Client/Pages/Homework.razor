@@ -141,7 +141,13 @@ else
     @foreach (var hw in homeworkItems)
     {
         <div class="card">
-            <h3>@hw.Title</h3>
+            <div class="homework-row-header">
+                <h3>@hw.Title</h3>
+                @if (!IsStudent)
+                {
+                    <button class="primary" @onclick="() => OpenResultsModal(hw)">View student homework</button>
+                }
+            </div>
             <p><strong>Subject:</strong> @hw.Subject</p>
             <p><strong>Due:</strong> @hw.DueDate.ToString("yyyy-MM-dd")</p>
             <p><strong>Teacher Id:</strong> @hw.TeacherId</p>
@@ -153,7 +159,6 @@ else
             @if (!IsStudent)
             {
                 <button class="secondary" @onclick="() => OpenSubmittedModal(hw)">View submitted homework</button>
-                <button class="secondary" @onclick="() => OpenResultsModal(hw)">View student homework</button>
             }
             <div class="homework-content">@RenderHtml(hw.TextContent)</div>
             @if (!string.IsNullOrWhiteSpace(hw.ImageUrl))

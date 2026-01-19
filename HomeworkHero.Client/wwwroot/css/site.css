@@ -378,6 +378,21 @@ button.secondary {
     box-shadow: var(--shadow);
 }
 
+.homework-row-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.homework-row-header h3 {
+    margin: 0;
+}
+
+.homework-row-header .primary {
+    white-space: nowrap;
+}
+
 .homework-card__header {
     display: flex;
     align-items: center;
