@@ -12,6 +12,11 @@
 }
 else
 {
+    @if (!string.IsNullOrWhiteSpace(StatusMessage))
+    {
+        <p class="@(IsError ? "text-error" : "text-success")">@StatusMessage</p>
+    }
+
     <section class="card">
         <h2>Current classrooms</h2>
         @if (classrooms.Count == 0)
@@ -45,6 +50,29 @@ else
                 }
             </div>
         }
+
+        <div class="divider"></div>
+        <h3>Create a classroom</h3>
+        <p>Add a new classroom group and optionally set the primary teacher.</p>
+        <div class="grid">
+            <div>
+                <label>Classroom name</label>
+                <InputText @bind-Value="newGroupId" placeholder="Enter a classroom name" />
+            </div>
+            <div>
+                <label>Primary teacher</label>
+                <InputSelect @bind-Value="newTeacherId">
+                    <option value="">Unassigned</option>
+                    @foreach (var teacher in teachers)
+                    {
+                        <option value="@teacher.Id">@teacher.FirstName @teacher.LastName (@teacher.Email)</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+        <div class="button-row">
+            <button type="button" @onclick="CreateClassroom" disabled="@IsSubmitting">Create classroom</button>
+        </div>
     </section>
 
     <section class="card">
@@ -127,6 +155,8 @@ else
     private int selectedEditClassroomId;
     private string editGroupId = string.Empty;
     private int? editTeacherId;
+    private string newGroupId = string.Empty;
+    private int? newTeacherId;
 
     private string? StatusMessage;
     private bool IsError;
@@ -212,6 +242,43 @@ else
         {
             var error = await response.Content.ReadAsStringAsync();
             StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to add teacher to classroom." : error;
+            IsError = true;
+        }
+
+        IsSubmitting = false;
+    }
+
+    private async Task CreateClassroom()
+    {
+        if (string.IsNullOrWhiteSpace(newGroupId))
+        {
+            StatusMessage = "Please enter a classroom name.";
+            IsError = true;
+            return;
+        }
+
+        IsSubmitting = true;
+        IsError = false;
+        StatusMessage = null;
+
+        var request = new CreateClassroomRequest
+        {
+            GroupId = newGroupId,
+            TeacherId = newTeacherId
+        };
+
+        var response = await Http.PostAsJsonAsync("api/admin/classrooms", request);
+        if (response.IsSuccessStatusCode)
+        {
+            StatusMessage = "Classroom created.";
+            await LoadData();
+            newGroupId = string.Empty;
+            newTeacherId = null;
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to create classroom." : error;
             IsError = true;
         }
 
