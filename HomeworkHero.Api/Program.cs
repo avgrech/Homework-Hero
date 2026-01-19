@@ -453,6 +453,7 @@ homework.MapGet("/student/{studentId:int}", async (int studentId, HomeworkHeroCo
         .ToListAsync();
 
     var assignedHomework = await db.HomeworkItems
+        .Include(h => h.Results.Where(r => r.StudentId == studentId))
         .Where(h => h.AssignedStudentId == studentId || (h.AssignedGroupId != null && groupIds.Contains(h.AssignedGroupId)))
         .ToListAsync();
 

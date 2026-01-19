@@ -45,6 +45,10 @@ else
                     <h3>@hw.Title</h3>
                     <span class="status-chip">@GetStatusLabel(hw)</span>
                 </div>
+                @if (IsSubmitted(hw))
+                {
+                    <div class="submitted-badge">Submitted</div>
+                }
                 <p class="muted">Teacher: @TeacherName(hw)</p>
                 <p class="muted">Date given: @hw.DateAssigned</p>
                 <p class="muted">Due date: @hw.DueDate</p>
@@ -156,6 +160,11 @@ else
 
     private string GetStatusClass(HomeworkItem hw)
     {
+        if (IsSubmitted(hw))
+        {
+            return "status-submitted";
+        }
+
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         if (hw.DueDate < today)
         {
@@ -172,6 +181,11 @@ else
 
     private string GetStatusLabel(HomeworkItem hw)
     {
+        if (IsSubmitted(hw))
+        {
+            return "Submitted";
+        }
+
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         if (hw.DueDate < today)
         {
@@ -189,6 +203,16 @@ else
         }
 
         return $"Due in {(hw.DueDate.ToDateTime(TimeOnly.MinValue) - today.ToDateTime(TimeOnly.MinValue)).Days} days";
+    }
+
+    private bool IsSubmitted(HomeworkItem hw)
+    {
+        if (!IsStudent || !Auth.StudentId.HasValue)
+        {
+            return false;
+        }
+
+        return hw.Results?.Any(result => result.StudentId == Auth.StudentId.Value) ?? false;
     }
 
     private string TeacherName(HomeworkItem hw)
