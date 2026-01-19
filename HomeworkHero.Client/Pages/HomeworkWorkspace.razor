@@ -2,6 +2,7 @@
 @page "/homework-workspace"
 @using System.ComponentModel.DataAnnotations
 @inject HttpClient Http
+@inject AuthState Auth
 
 <h1>Homework workspace</h1>
 <p>Review the assignment, add your work, and use the chat to ask for help as you go.</p>
@@ -61,14 +62,14 @@ else
                                     <p class="muted">Selected: @submission.FileName (@submission.FileSizeKb KB)</p>
                                 }
 
-                                <button type="submit" class="button-compact">Submit homework</button>
+                                <button type="submit" class="button-compact" disabled="@isSubmitting">@(isSubmitting ? "Submitting..." : "Submit homework")</button>
                             </div>
                         </div>
                         
                     </EditForm>
                     @if (!string.IsNullOrWhiteSpace(submissionStatus))
                     {
-                        <p class="text-success">@submissionStatus</p>
+                        <p class="@(submissionHadError ? "text-error" : "text-success")">@submissionStatus</p>
                     }
                 </div>
             }
@@ -121,6 +122,8 @@ else
     private ChatInput chatInput = new();
     private HomeworkSubmission submission = new();
     private string submissionStatus = string.Empty;
+    private bool submissionHadError;
+    private bool isSubmitting;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -177,24 +180,88 @@ else
         if (file is null)
         {
             submission.FileName = null;
-            submission.FileDataUrl = null;
             submission.FileSizeKb = null;
+            submission.File = null;
             return;
         }
 
+        submission.File = file;
         submission.FileName = file.Name;
         submission.FileSizeKb = (int)(file.Size / 1024);
-
-        using var stream = file.OpenReadStream(2 * 1024 * 1024);
-        using var ms = new MemoryStream();
-        await stream.CopyToAsync(ms);
-        submission.FileDataUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
     }
 
-    private Task SubmitHomework()
+    private async Task SubmitHomework()
     {
-        submissionStatus = "Submission saved. We'll send it to your teacher.";
-        return Task.CompletedTask;
+        submissionStatus = string.Empty;
+        submissionHadError = false;
+
+        if (homework is null)
+        {
+            submissionStatus = "Select a homework item before submitting.";
+            submissionHadError = true;
+            return;
+        }
+
+        if (!Auth.StudentId.HasValue)
+        {
+            submissionStatus = "We couldn't find a student profile for this account.";
+            submissionHadError = true;
+            return;
+        }
+
+        isSubmitting = true;
+
+        try
+        {
+            string? uploadedUrl = null;
+            if (submission.File is not null)
+            {
+                using var content = new MultipartFormDataContent();
+                await using var stream = submission.File.OpenReadStream(10 * 1024 * 1024);
+                var fileContent = new StreamContent(stream);
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(submission.File.ContentType);
+                content.Add(fileContent, "file", submission.File.Name);
+
+                var uploadResponse = await Http.PostAsync("api/uploads", content);
+                if (!uploadResponse.IsSuccessStatusCode)
+                {
+                    submissionStatus = "Upload failed. Please try again.";
+                    submissionHadError = true;
+                    return;
+                }
+
+                var uploadResult = await uploadResponse.Content.ReadFromJsonAsync<UploadResponse>();
+                uploadedUrl = uploadResult?.Url;
+            }
+
+            var result = new HomeworkResult
+            {
+                StudentId = Auth.StudentId.Value,
+                ResultText = string.IsNullOrWhiteSpace(submission.Notes) ? null : submission.Notes.Trim(),
+                ResultImageUrl = uploadedUrl,
+                SubmittedAt = DateTime.UtcNow
+            };
+
+            var response = await Http.PostAsJsonAsync($"api/homework/{homework.Id}/results", result);
+            if (!response.IsSuccessStatusCode)
+            {
+                submissionStatus = "We couldn't submit your homework. Please try again.";
+                submissionHadError = true;
+                return;
+            }
+
+            submissionStatus = "Submission saved. We'll send it to your teacher.";
+            submission = new HomeworkSubmission();
+        }
+        catch (Exception ex)
+        {
+            submissionStatus = $"Submission failed: {ex.Message}";
+            submissionHadError = true;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
     }
 
     private MarkupString RenderHtml(string? content)
@@ -225,7 +292,12 @@ else
     {
         public string Notes { get; set; } = string.Empty;
         public string? FileName { get; set; }
-        public string? FileDataUrl { get; set; }
+        public IBrowserFile? File { get; set; }
         public int? FileSizeKb { get; set; }
+    }
+
+    private class UploadResponse
+    {
+        public string? Url { get; set; }
     }
 }
