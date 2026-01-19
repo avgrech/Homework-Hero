@@ -4,16 +4,18 @@ using HomeworkHero.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace HomeworkHero.Api.Migrations
 {
     [DbContext(typeof(HomeworkHeroContext))]
-    partial class HomeworkHeroContextModelSnapshot : ModelSnapshot
+    [Migration("20250310153000_AddStudentCorrections")]
+    partial class AddStudentCorrections
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -157,40 +159,6 @@ namespace HomeworkHero.Api.Migrations
                     b.ToTable("HomeworkResults");
                 });
 
-            modelBuilder.Entity("HomeworkHero.Shared.Models.StudentCorrection", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("HomeworkResultId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal?>("Mark")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("Notes")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<int>("TeacherId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("HomeworkResultId");
-
-                    b.HasIndex("TeacherId");
-
-                    b.ToTable("StudentCorrections");
-                });
-
             modelBuilder.Entity("HomeworkHero.Shared.Models.Notification", b =>
                 {
                     b.Property<int>("Id")
@@ -271,7 +239,7 @@ namespace HomeworkHero.Api.Migrations
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -288,6 +256,9 @@ namespace HomeworkHero.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Email")
+                        .IsUnique();
+
                     b.ToTable("Students");
                 });
 
@@ -299,13 +270,13 @@ namespace HomeworkHero.Api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime>("ActionDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("ActionType")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("HomeworkItemId")
                         .HasColumnType("int");
@@ -345,6 +316,40 @@ namespace HomeworkHero.Api.Migrations
                     b.HasIndex("ConditionId");
 
                     b.ToTable("StudentConditions");
+                });
+
+            modelBuilder.Entity("HomeworkHero.Shared.Models.StudentCorrection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("HomeworkResultId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("Mark")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("TeacherId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HomeworkResultId");
+
+                    b.HasIndex("TeacherId");
+
+                    b.ToTable("StudentCorrections");
                 });
 
             modelBuilder.Entity("HomeworkHero.Shared.Models.StudentPrompt", b =>
@@ -396,13 +401,14 @@ namespace HomeworkHero.Api.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("GroupId")
+                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<DateOnly?>("EndDate")
+                    b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
 
-                    b.Property<DateOnly>("StartDate")
+                    b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date");
 
                     b.HasKey("StudentId", "TeacherId", "GroupId");
@@ -427,7 +433,7 @@ namespace HomeworkHero.Api.Migrations
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
@@ -440,6 +446,9 @@ namespace HomeworkHero.Api.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
 
                     b.ToTable("Teachers");
                 });
@@ -559,25 +568,6 @@ namespace HomeworkHero.Api.Migrations
                     b.Navigation("Student");
                 });
 
-            modelBuilder.Entity("HomeworkHero.Shared.Models.StudentCorrection", b =>
-                {
-                    b.HasOne("HomeworkHero.Shared.Models.HomeworkResult", "HomeworkResult")
-                        .WithMany("StudentCorrections")
-                        .HasForeignKey("HomeworkResultId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("HomeworkHero.Shared.Models.Teacher", "Teacher")
-                        .WithMany()
-                        .HasForeignKey("TeacherId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("HomeworkResult");
-
-                    b.Navigation("Teacher");
-                });
-
             modelBuilder.Entity("HomeworkHero.Shared.Models.Notification", b =>
                 {
                     b.HasOne("HomeworkHero.Shared.Models.HomeworkItem", "HomeworkItem")
@@ -639,6 +629,25 @@ namespace HomeworkHero.Api.Migrations
                     b.Navigation("Condition");
 
                     b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("HomeworkHero.Shared.Models.StudentCorrection", b =>
+                {
+                    b.HasOne("HomeworkHero.Shared.Models.HomeworkResult", "HomeworkResult")
+                        .WithMany("StudentCorrections")
+                        .HasForeignKey("HomeworkResultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HomeworkHero.Shared.Models.Teacher", "Teacher")
+                        .WithMany()
+                        .HasForeignKey("TeacherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("HomeworkResult");
+
+                    b.Navigation("Teacher");
                 });
 
             modelBuilder.Entity("HomeworkHero.Shared.Models.StudentPrompt", b =>

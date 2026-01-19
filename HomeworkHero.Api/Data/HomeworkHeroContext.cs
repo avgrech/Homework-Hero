@@ -19,6 +19,7 @@ public class HomeworkHeroContext : DbContext
     public DbSet<StudentAction> StudentActions => Set<StudentAction>();
     public DbSet<StudentPrompt> StudentPrompts => Set<StudentPrompt>();
     public DbSet<HomeworkResult> HomeworkResults => Set<HomeworkResult>();
+    public DbSet<StudentCorrection> StudentCorrections => Set<StudentCorrection>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
@@ -74,6 +75,18 @@ public class HomeworkHeroContext : DbContext
             .HasOne(h => h.AssignedStudent)
             .WithMany()
             .HasForeignKey(h => h.AssignedStudentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<StudentCorrection>()
+            .HasOne(sc => sc.HomeworkResult)
+            .WithMany(r => r.StudentCorrections)
+            .HasForeignKey(sc => sc.HomeworkResultId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<StudentCorrection>()
+            .HasOne(sc => sc.Teacher)
+            .WithMany()
+            .HasForeignKey(sc => sc.TeacherId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<User>()
