@@ -243,46 +243,48 @@ else
                 <button class="ghost" @onclick="CloseCorrectionModal" aria-label="Close">✕</button>
             </header>
 
-            <div class="stacked-form">
-                <div>
-                    <p class="muted">Homework</p>
-                    <div class="homework-content">@RenderHtml(selectedHomework.TextContent)</div>
+            <div class="correction-layout">
+                <div class="correction-content">
+                    <div>
+                        <p class="muted">Homework</p>
+                        <div class="homework-content">@RenderHtml(selectedHomework.TextContent)</div>
+                    </div>
+                    <div>
+                        <p class="muted">Submission</p>
+                        @if (!string.IsNullOrWhiteSpace(selectedSubmission.ResultText))
+                        {
+                            <div class="homework-content">@RenderHtml(selectedSubmission.ResultText)</div>
+                        }
+                        else
+                        {
+                            <p>No written submission.</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(selectedSubmission.ResultImageUrl))
+                        {
+                            <p><a href="@selectedSubmission.ResultImageUrl" target="_blank">View submitted image</a></p>
+                        }
+                    </div>
                 </div>
-                <div>
-                    <p class="muted">Submission</p>
-                    @if (!string.IsNullOrWhiteSpace(selectedSubmission.ResultText))
-                    {
-                        <div class="homework-content">@RenderHtml(selectedSubmission.ResultText)</div>
-                    }
-                    else
-                    {
-                        <p>No written submission.</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(selectedSubmission.ResultImageUrl))
-                    {
-                        <p><a href="@selectedSubmission.ResultImageUrl" target="_blank">View submitted image</a></p>
-                    }
-                </div>
-            </div>
 
-            <EditForm Model="correctionForm" OnValidSubmit="SubmitCorrection" class="stacked-form">
-                <div class="form-row">
-                    <label>Mark</label>
-                    <InputNumber class="text-input" TValue="decimal?" @bind-Value="correctionForm.Mark" />
-                </div>
-                <div class="form-row">
-                    <label>Notes</label>
-                    <InputTextArea class="text-input" @bind-Value="correctionForm.Notes" />
-                </div>
-                @if (!string.IsNullOrWhiteSpace(correctionStatus))
-                {
-                    <p class="muted">@correctionStatus</p>
-                }
-                <div class="form-actions">
-                    <button type="button" class="ghost" @onclick="CloseCorrectionModal">Cancel</button>
-                    <button type="submit" class="primary" disabled="@isSavingCorrection">Save correction</button>
-                </div>
-            </EditForm>
+                <EditForm Model="correctionForm" OnValidSubmit="SubmitCorrection" class="stacked-form correction-form">
+                    <div class="form-row">
+                        <label>Mark</label>
+                        <InputNumber class="text-input" TValue="decimal?" @bind-Value="correctionForm.Mark" />
+                    </div>
+                    <div class="form-row">
+                        <label>Notes</label>
+                        <InputTextArea class="text-input" @bind-Value="correctionForm.Notes" />
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(correctionStatus))
+                    {
+                        <p class="muted">@correctionStatus</p>
+                    }
+                    <div class="form-actions">
+                        <button type="button" class="ghost" @onclick="CloseCorrectionModal">Cancel</button>
+                        <button type="submit" class="primary" disabled="@isSavingCorrection">Save correction</button>
+                    </div>
+                </EditForm>
+            </div>
         </div>
     </div>
 }
