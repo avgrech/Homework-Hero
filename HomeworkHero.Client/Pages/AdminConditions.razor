@@ -1,0 +1,131 @@
+@page "/admin/conditions"
+@inject HttpClient Http
+@inject AuthState Auth
+
+<h1>Conditions</h1>
+<p>Add and manage the conditions that can be linked to student profiles.</p>
+
+@if (!IsAdmin)
+{
+    <p class="text-error">You must be signed in as an admin to use this page.</p>
+    <NavLink href="/login">Go to login</NavLink>
+}
+else
+{
+    <section class="card">
+        <h2>Add a condition</h2>
+        <p>Use short names so staff can quickly tag a student record.</p>
+
+        @if (!string.IsNullOrWhiteSpace(StatusMessage))
+        {
+            <p class="@(IsError ? "text-error" : "text-success")">@StatusMessage</p>
+        }
+
+        <EditForm Model="newCondition" OnValidSubmit="CreateCondition">
+            <DataAnnotationsValidator />
+            <div class="grid">
+                <div>
+                    <label>Name</label>
+                    <InputText @bind-Value="newCondition.Name" />
+                </div>
+                <div>
+                    <label>Description</label>
+                    <InputTextArea @bind-Value="newCondition.Description" />
+                </div>
+            </div>
+            <button type="submit" disabled="@IsSubmitting">@((IsSubmitting ? "Saving..." : "Add condition"))</button>
+        </EditForm>
+    </section>
+
+    <section class="card">
+        <h2>Existing conditions</h2>
+        @if (conditions.Count == 0)
+        {
+            <p>No conditions added yet.</p>
+        }
+        else
+        {
+            <div class="grid">
+                @foreach (var condition in conditions)
+                {
+                    <div class="callout">
+                        <h3>@condition.Name</h3>
+                        @if (!string.IsNullOrWhiteSpace(condition.Description))
+                        {
+                            <p>@condition.Description</p>
+                        }
+                        else
+                        {
+                            <p class="muted">No description provided.</p>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private List<Condition> conditions = new();
+    private Condition newCondition = new();
+    private string? StatusMessage;
+    private bool IsError;
+    private bool IsSubmitting;
+
+    private bool IsAdmin => Auth.IsAuthenticated && string.Equals(Auth.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsAdmin)
+        {
+            return;
+        }
+
+        await LoadConditions();
+    }
+
+    private async Task LoadConditions()
+    {
+        try
+        {
+            conditions = await Http.GetFromJsonAsync<List<Condition>>("api/conditions") ?? new();
+            conditions = conditions.OrderBy(c => c.Name).ToList();
+        }
+        catch
+        {
+            StatusMessage = "Unable to load conditions right now.";
+            IsError = true;
+            conditions = new();
+        }
+    }
+
+    private async Task CreateCondition()
+    {
+        if (string.IsNullOrWhiteSpace(newCondition.Name))
+        {
+            StatusMessage = "Please enter a condition name.";
+            IsError = true;
+            return;
+        }
+
+        IsSubmitting = true;
+        IsError = false;
+        StatusMessage = null;
+
+        var response = await Http.PostAsJsonAsync("api/conditions", newCondition);
+        if (response.IsSuccessStatusCode)
+        {
+            StatusMessage = "Condition added.";
+            newCondition = new Condition();
+            await LoadConditions();
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to add condition." : error;
+            IsError = true;
+        }
+
+        IsSubmitting = false;
+    }
+}
