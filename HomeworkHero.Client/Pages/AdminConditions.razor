@@ -23,6 +23,7 @@ else
 
         <EditForm Model="newCondition" OnValidSubmit="CreateCondition">
             <DataAnnotationsValidator />
+            <ValidationSummary />
             <div class="grid">
                 <div>
                     <label>Name</label>
@@ -48,16 +49,47 @@ else
             <div class="grid">
                 @foreach (var condition in conditions)
                 {
+                    var editor = GetEditor(condition.Id);
                     <div class="callout">
-                        <h3>@condition.Name</h3>
-                        @if (!string.IsNullOrWhiteSpace(condition.Description))
+                        @if (editor.IsEditing)
                         {
-                            <p>@condition.Description</p>
+                            <div class="stacked-form">
+                                <div>
+                                    <label>Name</label>
+                                    <InputText @bind-Value="editor.Name" />
+                                </div>
+                                <div>
+                                    <label>Description</label>
+                                    <InputTextArea @bind-Value="editor.Description" />
+                                </div>
+                            </div>
                         }
                         else
                         {
-                            <p class="muted">No description provided.</p>
+                            <h3>@condition.Name</h3>
+                            @if (!string.IsNullOrWhiteSpace(condition.Description))
+                            {
+                                <p>@condition.Description</p>
+                            }
+                            else
+                            {
+                                <p class="muted">No description provided.</p>
+                            }
+                            <p class="muted">Assigned to @condition.AssignedStudentCount student(s).</p>
                         }
+
+                        <div class="form-actions">
+                            @if (editor.IsEditing)
+                            {
+                                <button type="button" class="primary" disabled="@IsSaving(condition.Id)" @onclick="() => SaveCondition(condition.Id)">Save</button>
+                                <button type="button" class="ghost" @onclick="() => CancelEdit(condition.Id)">Cancel</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="ghost" @onclick="() => StartEdit(condition.Id)">Edit</button>
+                                <button type="button" class="ghost" disabled="@IsDeleting(condition.Id)" @onclick="() => ConfirmDelete(condition)">Delete</button>
+                            }
+                        </div>
                     </div>
                 }
             </div>
@@ -65,14 +97,67 @@ else
     </section>
 }
 
+@if (showDeleteModal && deleteTarget is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseDeleteModal">
+        <div class="modal-panel" @onclick:stopPropagation>
+            <header class="modal-header">
+                <div>
+                    <p class="eyebrow">Delete condition</p>
+                    <h3>@deleteTarget.Name</h3>
+                </div>
+                <button class="ghost" @onclick="CloseDeleteModal" aria-label="Close">✕</button>
+            </header>
+
+            <p>
+                This condition is assigned to <strong>@deleteTarget.AssignedStudentCount</strong> student(s).
+                Choose how to handle those assignments before deleting it.
+            </p>
+
+            <div class="stacked-form">
+                <div>
+                    <label>Assign a replacement condition</label>
+                    <InputSelect @bind-Value="replacementConditionId">
+                        <option value="">Select a condition</option>
+                        @foreach (var option in ReplacementConditions)
+                        {
+                            <option value="@option.Id">@option.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="ghost" @onclick="CloseDeleteModal">Cancel</button>
+                <button type="button" class="primary" disabled="@(!replacementConditionId.HasValue)" @onclick="ConfirmReplacementDelete">
+                    Assign replacement condition
+                </button>
+                <button type="button" class="ghost" @onclick="ConfirmRemoveAssignments">
+                    Remove condition from students
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
-    private List<Condition> conditions = new();
+    private List<ConditionSummaryDto> conditions = new();
     private Condition newCondition = new();
     private string? StatusMessage;
     private bool IsError;
     private bool IsSubmitting;
+    private readonly Dictionary<int, ConditionEditor> editors = new();
+    private readonly HashSet<int> savingConditionIds = new();
+    private readonly HashSet<int> deletingConditionIds = new();
+    private bool showDeleteModal;
+    private ConditionSummaryDto? deleteTarget;
+    private int? replacementConditionId;
 
     private bool IsAdmin => Auth.IsAuthenticated && string.Equals(Auth.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+    private IEnumerable<ConditionSummaryDto> ReplacementConditions =>
+        deleteTarget is null
+            ? Enumerable.Empty<ConditionSummaryDto>()
+            : conditions.Where(c => c.Id != deleteTarget.Id);
 
     protected override async Task OnInitializedAsync()
     {
@@ -88,14 +173,16 @@ else
     {
         try
         {
-            conditions = await Http.GetFromJsonAsync<List<Condition>>("api/conditions") ?? new();
+            conditions = await Http.GetFromJsonAsync<List<ConditionSummaryDto>>("api/conditions") ?? new();
             conditions = conditions.OrderBy(c => c.Name).ToList();
+            SyncEditors();
         }
         catch
         {
             StatusMessage = "Unable to load conditions right now.";
             IsError = true;
             conditions = new();
+            editors.Clear();
         }
     }
 
@@ -127,5 +214,205 @@ else
         }
 
         IsSubmitting = false;
+    }
+
+    private ConditionEditor GetEditor(int conditionId)
+    {
+        if (!editors.TryGetValue(conditionId, out var editor))
+        {
+            editor = new ConditionEditor();
+            editors[conditionId] = editor;
+        }
+
+        return editor;
+    }
+
+    private void SyncEditors()
+    {
+        var knownIds = conditions.Select(c => c.Id).ToHashSet();
+        var staleIds = editors.Keys.Where(id => !knownIds.Contains(id)).ToList();
+        foreach (var id in staleIds)
+        {
+            editors.Remove(id);
+        }
+
+        foreach (var condition in conditions)
+        {
+            if (!editors.TryGetValue(condition.Id, out var editor))
+            {
+                editors[condition.Id] = new ConditionEditor
+                {
+                    Name = condition.Name,
+                    Description = condition.Description
+                };
+            }
+            else if (!editor.IsEditing)
+            {
+                editor.Name = condition.Name;
+                editor.Description = condition.Description;
+            }
+        }
+    }
+
+    private void StartEdit(int conditionId)
+    {
+        if (editors.TryGetValue(conditionId, out var editor))
+        {
+            editor.IsEditing = true;
+        }
+    }
+
+    private void CancelEdit(int conditionId)
+    {
+        if (editors.TryGetValue(conditionId, out var editor))
+        {
+            var condition = conditions.FirstOrDefault(c => c.Id == conditionId);
+            if (condition is not null)
+            {
+                editor.Name = condition.Name;
+                editor.Description = condition.Description;
+            }
+
+            editor.IsEditing = false;
+        }
+    }
+
+    private async Task SaveCondition(int conditionId)
+    {
+        if (!editors.TryGetValue(conditionId, out var editor))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(editor.Name))
+        {
+            StatusMessage = "Please enter a condition name.";
+            IsError = true;
+            return;
+        }
+
+        savingConditionIds.Add(conditionId);
+        StatusMessage = null;
+        IsError = false;
+
+        var update = new ConditionUpdateRequest(editor.Name, editor.Description);
+        var response = await Http.PutAsJsonAsync($"api/conditions/{conditionId}", update);
+        if (response.IsSuccessStatusCode)
+        {
+            var updated = await response.Content.ReadFromJsonAsync<ConditionSummaryDto>();
+            if (updated is not null)
+            {
+                var index = conditions.FindIndex(c => c.Id == conditionId);
+                if (index >= 0)
+                {
+                    conditions[index] = updated;
+                }
+
+                editor.Name = updated.Name;
+                editor.Description = updated.Description;
+                editor.IsEditing = false;
+                StatusMessage = "Condition updated.";
+            }
+
+            SyncEditors();
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to update condition." : error;
+            IsError = true;
+        }
+
+        savingConditionIds.Remove(conditionId);
+    }
+
+    private void ConfirmDelete(ConditionSummaryDto condition)
+    {
+        if (condition.AssignedStudentCount > 0)
+        {
+            deleteTarget = condition;
+            replacementConditionId = null;
+            showDeleteModal = true;
+            return;
+        }
+
+        _ = DeleteCondition(condition, null);
+    }
+
+    private void CloseDeleteModal()
+    {
+        showDeleteModal = false;
+        deleteTarget = null;
+        replacementConditionId = null;
+    }
+
+    private async Task ConfirmReplacementDelete()
+    {
+        if (deleteTarget is null || !replacementConditionId.HasValue)
+        {
+            return;
+        }
+
+        var request = new ConditionDeleteRequest(replacementConditionId, false);
+        await DeleteCondition(deleteTarget, request);
+        CloseDeleteModal();
+    }
+
+    private async Task ConfirmRemoveAssignments()
+    {
+        if (deleteTarget is null)
+        {
+            return;
+        }
+
+        var request = new ConditionDeleteRequest(null, true);
+        await DeleteCondition(deleteTarget, request);
+        CloseDeleteModal();
+    }
+
+    private async Task DeleteCondition(ConditionSummaryDto condition, ConditionDeleteRequest? request)
+    {
+        deletingConditionIds.Add(condition.Id);
+        StatusMessage = null;
+        IsError = false;
+
+        HttpResponseMessage response;
+        if (request is null)
+        {
+            response = await Http.DeleteAsync($"api/conditions/{condition.Id}");
+        }
+        else
+        {
+            var message = new HttpRequestMessage(HttpMethod.Delete, $"api/conditions/{condition.Id}")
+            {
+                Content = JsonContent.Create(request)
+            };
+            response = await Http.SendAsync(message);
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            StatusMessage = "Condition deleted.";
+            await LoadConditions();
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to delete condition." : error;
+            IsError = true;
+        }
+
+        deletingConditionIds.Remove(condition.Id);
+    }
+
+    private bool IsSaving(int conditionId) => savingConditionIds.Contains(conditionId);
+
+    private bool IsDeleting(int conditionId) => deletingConditionIds.Contains(conditionId);
+
+    private sealed class ConditionEditor
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public bool IsEditing { get; set; }
     }
 }

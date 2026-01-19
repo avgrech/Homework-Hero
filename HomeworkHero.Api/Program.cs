@@ -291,12 +291,130 @@ teachers.MapGet("/{teacherId:int}/notifications", async (int teacherId, Homework
 });
 
 var conditions = app.MapGroup("/api/conditions");
-conditions.MapGet("/", async (HomeworkHeroContext db) => await db.Conditions.ToListAsync());
+conditions.MapGet("/", async (HomeworkHeroContext db) =>
+    await db.Conditions
+        .OrderBy(c => c.Name)
+        .Select(c => new ConditionSummaryDto(
+            c.Id,
+            c.Name,
+            c.Description,
+            c.StudentConditions.Count))
+        .ToListAsync());
 conditions.MapPost("/", async (Condition condition, HomeworkHeroContext db) =>
 {
+    if (string.IsNullOrWhiteSpace(condition.Name))
+    {
+        return Results.BadRequest("Name is required.");
+    }
+
+    condition.Name = condition.Name.Trim();
+    condition.Description = condition.Description?.Trim() ?? string.Empty;
+
     db.Conditions.Add(condition);
     await db.SaveChangesAsync();
-    return Results.Created($"/api/conditions/{condition.Id}", condition);
+    return Results.Created($"/api/conditions/{condition.Id}", new ConditionSummaryDto(
+        condition.Id,
+        condition.Name,
+        condition.Description,
+        0));
+});
+conditions.MapPut("/{id:int}", async (int id, ConditionUpdateRequest request, HomeworkHeroContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Name))
+    {
+        return Results.BadRequest("Name is required.");
+    }
+
+    var condition = await db.Conditions.FindAsync(id);
+    if (condition is null)
+    {
+        return Results.NotFound();
+    }
+
+    condition.Name = request.Name.Trim();
+    condition.Description = request.Description?.Trim() ?? string.Empty;
+
+    await db.SaveChangesAsync();
+
+    var assignedCount = await db.StudentConditions.CountAsync(sc => sc.ConditionId == id);
+    return Results.Ok(new ConditionSummaryDto(
+        condition.Id,
+        condition.Name,
+        condition.Description,
+        assignedCount));
+});
+conditions.MapDelete("/{id:int}", async (int id, ConditionDeleteRequest? request, HomeworkHeroContext db) =>
+{
+    var condition = await db.Conditions.FirstOrDefaultAsync(c => c.Id == id);
+    if (condition is null)
+    {
+        return Results.NotFound();
+    }
+
+    var assignedStudentIds = await db.StudentConditions
+        .Where(sc => sc.ConditionId == id)
+        .Select(sc => sc.StudentId)
+        .ToListAsync();
+
+    if (assignedStudentIds.Count > 0)
+    {
+        if (request is null)
+        {
+            return Results.BadRequest($"Condition is assigned to {assignedStudentIds.Count} student(s).");
+        }
+
+        if (request.ReplacementConditionId.HasValue)
+        {
+            var replacementId = request.ReplacementConditionId.Value;
+            if (replacementId == id)
+            {
+                return Results.BadRequest("Replacement condition must be different.");
+            }
+
+            var replacementExists = await db.Conditions.AnyAsync(c => c.Id == replacementId);
+            if (!replacementExists)
+            {
+                return Results.BadRequest("Replacement condition not found.");
+            }
+
+            var studentsWithReplacement = await db.StudentConditions
+                .Where(sc => sc.ConditionId == replacementId && assignedStudentIds.Contains(sc.StudentId))
+                .Select(sc => sc.StudentId)
+                .ToListAsync();
+
+            if (studentsWithReplacement.Count > 0)
+            {
+                var duplicates = await db.StudentConditions
+                    .Where(sc => sc.ConditionId == id && studentsWithReplacement.Contains(sc.StudentId))
+                    .ToListAsync();
+                db.StudentConditions.RemoveRange(duplicates);
+            }
+
+            var toUpdate = await db.StudentConditions
+                .Where(sc => sc.ConditionId == id && !studentsWithReplacement.Contains(sc.StudentId))
+                .ToListAsync();
+
+            foreach (var assignment in toUpdate)
+            {
+                assignment.ConditionId = replacementId;
+            }
+        }
+        else if (request.RemoveAssignments)
+        {
+            var toRemove = await db.StudentConditions
+                .Where(sc => sc.ConditionId == id)
+                .ToListAsync();
+            db.StudentConditions.RemoveRange(toRemove);
+        }
+        else
+        {
+            return Results.BadRequest("Choose how to handle assigned students.");
+        }
+    }
+
+    db.Conditions.Remove(condition);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
 });
 
 var homework = app.MapGroup("/api/homework");
