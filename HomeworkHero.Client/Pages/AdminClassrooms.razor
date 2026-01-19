@@ -136,6 +136,42 @@ else
             <button type="button" @onclick="AddTeacherToClassroom" disabled="@IsSubmitting">Add teacher</button>
         </div>
     </section>
+
+    <section class="card">
+        <h2>Edit a classroom</h2>
+        <p>Update the classroom name or the primary teacher for classrooms created here.</p>
+
+        <div class="grid">
+            <div>
+                <label>Classroom</label>
+                <InputSelect @bind-Value="selectedEditClassroomId" @onchange="OnEditClassroomChanged">
+                    <option value="0">Select a classroom</option>
+                    @foreach (var classroom in EditableClassrooms)
+                    {
+                        <option value="@classroom.ClassroomId">@classroom.GroupId</option>
+                    }
+                </InputSelect>
+            </div>
+            <div>
+                <label>Updated classroom name</label>
+                <InputText @bind-Value="editGroupId" placeholder="Enter a new name" />
+            </div>
+            <div>
+                <label>Primary teacher</label>
+                <InputSelect @bind-Value="editTeacherId">
+                    <option value="">Unassigned</option>
+                    @foreach (var teacher in teachers)
+                    {
+                        <option value="@teacher.Id">@teacher.FirstName @teacher.LastName (@teacher.Email)</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <button type="button" @onclick="UpdateClassroom" disabled="@IsSubmitting">Update classroom</button>
+        </div>
+    </section>
 }
 
 @code {
@@ -153,6 +189,9 @@ else
 
     private int selectedTeacherId;
     private string selectedClassroomGroup = string.Empty;
+    private int selectedEditClassroomId;
+    private string editGroupId = string.Empty;
+    private int? editTeacherId;
 
     private string? StatusMessage;
     private bool IsError;
@@ -179,6 +218,10 @@ else
         .Where(group => !string.IsNullOrWhiteSpace(group))
         .Distinct()
         .OrderBy(group => group);
+
+    private IEnumerable<ClassroomSummaryDto> EditableClassrooms => classrooms
+        .Where(c => c.ClassroomId.HasValue)
+        .OrderBy(c => c.GroupId);
 
     protected override async Task OnInitializedAsync()
     {
@@ -323,6 +366,67 @@ else
         {
             var error = await response.Content.ReadAsStringAsync();
             StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to add teacher to classroom." : error;
+            IsError = true;
+        }
+
+        IsSubmitting = false;
+    }
+
+    private void OnEditClassroomChanged(ChangeEventArgs args)
+    {
+        if (args?.Value is null || !int.TryParse(args.Value.ToString(), out var classroomId))
+        {
+            selectedEditClassroomId = 0;
+            editGroupId = string.Empty;
+            editTeacherId = null;
+            return;
+        }
+
+        selectedEditClassroomId = classroomId;
+        var selected = classrooms.FirstOrDefault(c => c.ClassroomId == classroomId);
+        if (selected is null)
+        {
+            editGroupId = string.Empty;
+            editTeacherId = null;
+            return;
+        }
+
+        editGroupId = selected.GroupId;
+        editTeacherId = selected.TeacherId;
+    }
+
+    private async Task UpdateClassroom()
+    {
+        if (selectedEditClassroomId == 0 || string.IsNullOrWhiteSpace(editGroupId))
+        {
+            StatusMessage = "Please choose a classroom and enter a name.";
+            IsError = true;
+            return;
+        }
+
+        IsSubmitting = true;
+        IsError = false;
+        StatusMessage = null;
+
+        var request = new UpdateClassroomRequest
+        {
+            GroupId = editGroupId,
+            TeacherId = editTeacherId
+        };
+
+        var response = await Http.PutAsJsonAsync($"api/admin/classrooms/{selectedEditClassroomId}", request);
+        if (response.IsSuccessStatusCode)
+        {
+            StatusMessage = "Classroom updated.";
+            await LoadData();
+            selectedEditClassroomId = 0;
+            editGroupId = string.Empty;
+            editTeacherId = null;
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to update classroom." : error;
             IsError = true;
         }
 
