@@ -13,63 +13,6 @@
 else
 {
     <section class="card">
-        <h2>Assign students to a classroom</h2>
-        <p>Select a teacher, enter a classroom name (group ID), and choose which students belong in that classroom.</p>
-
-        @if (!string.IsNullOrWhiteSpace(StatusMessage))
-        {
-            <p class="@(IsError ? "text-error" : "text-success")">@StatusMessage</p>
-        }
-
-        <EditForm Model="assignment" OnValidSubmit="SubmitAssignment">
-            <DataAnnotationsValidator />
-            <div class="grid">
-                <div>
-                    <label>Teacher</label>
-                    <InputText @bind-Value="teacherSearch" placeholder="Search teachers" oninput="oninput" />
-                    <InputSelect @bind-Value="assignment.TeacherId">
-                        <option value="0">Select a teacher</option>
-                        @foreach (var teacher in FilteredTeachers)
-                        {
-                            <option value="@teacher.Id">@teacher.FirstName @teacher.LastName (@teacher.Email)</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div>
-                    <label>Classroom / Group ID</label>
-                    <InputText @bind-Value="assignment.GroupId" list="group-options" />
-                    <datalist id="group-options">
-                        @foreach (var group in classrooms.Select(c => c.GroupId).Distinct())
-                        {
-                            <option value="@group"></option>
-                        }
-                    </datalist>
-                </div>
-            </div>
-
-            <div class="student-selector">
-                <h3>Select students</h3>
-                <p class="muted">Choose one or more students to place in the classroom.</p>
-                <InputText @bind-Value="studentSearch" placeholder="Search by name or email" oninput="oninput" />
-                <div class="student-grid">
-                    @foreach (var student in FilteredStudents)
-                    {
-                        <label>
-                            <input type="checkbox" @checked="assignment.StudentIds.Contains(student.Id)" @onchange="() => ToggleStudent(student.Id)" />
-                            @student.FirstName @student.LastName (@student.Email)
-                        </label>
-                    }
-                </div>
-            </div>
-
-            <div class="button-row">
-                <button type="submit" disabled="@IsSubmitting">@((IsSubmitting ? "Saving..." : "Save classroom"))</button>
-                <button type="button" @onclick="CreateClassroom" disabled="@IsSubmitting">Create classroom</button>
-            </div>
-        </EditForm>
-    </section>
-
-    <section class="card">
         <h2>Current classrooms</h2>
         @if (classrooms.Count == 0)
         {
@@ -176,16 +119,8 @@ else
 
 @code {
     private List<Teacher> teachers = new();
-    private List<Student> students = new();
     private List<ClassroomSummaryDto> classrooms = new();
-    private string studentSearch = string.Empty;
     private string teacherSearch = string.Empty;
-    private ClassroomAssignmentRequest assignment = new()
-    {
-        TeacherId = 0,
-        GroupId = string.Empty,
-        StudentIds = new(),
-    };
 
     private int selectedTeacherId;
     private string selectedClassroomGroup = string.Empty;
@@ -198,13 +133,6 @@ else
     private bool IsSubmitting;
 
     private bool IsAdmin => Auth.IsAuthenticated && string.Equals(Auth.Role, "Admin", StringComparison.OrdinalIgnoreCase);
-
-    private IEnumerable<Student> FilteredStudents => string.IsNullOrWhiteSpace(studentSearch)
-        ? students
-        : students.Where(s =>
-            s.FirstName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
-            s.LastName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
-            s.Email.Contains(studentSearch, StringComparison.OrdinalIgnoreCase));
 
     private IEnumerable<Teacher> FilteredTeachers => string.IsNullOrWhiteSpace(teacherSearch)
         ? teachers
@@ -236,7 +164,6 @@ else
     private async Task LoadData()
     {
         teachers = await FetchOrEmpty<Teacher>("api/teachers") ?? new();
-        students = await FetchOrEmpty<Student>("api/students") ?? new();
         classrooms = await FetchOrEmpty<ClassroomSummaryDto>("api/admin/classrooms") ?? new();
     }
 
@@ -252,87 +179,6 @@ else
             IsError = true;
             return new();
         }
-    }
-
-    private void ToggleStudent(int studentId)
-    {
-        if (assignment.StudentIds.Contains(studentId))
-        {
-            assignment.StudentIds.Remove(studentId);
-        }
-        else
-        {
-            assignment.StudentIds.Add(studentId);
-        }
-    }
-
-    private async Task SubmitAssignment()
-    {
-        if (assignment.TeacherId == 0 || string.IsNullOrWhiteSpace(assignment.GroupId) || assignment.StudentIds.Count == 0)
-        {
-            StatusMessage = "Please choose a teacher, classroom, and at least one student.";
-            IsError = true;
-            return;
-        }
-
-        IsSubmitting = true;
-        IsError = false;
-        StatusMessage = null;
-
-        var response = await Http.PostAsJsonAsync("api/admin/classrooms/assign", assignment);
-        if (response.IsSuccessStatusCode)
-        {
-            StatusMessage = "Classroom saved.";
-            assignment = new()
-            {
-                TeacherId = assignment.TeacherId,
-                GroupId = assignment.GroupId,
-                StudentIds = new List<int>(),
-            };
-            await LoadData();
-        }
-        else
-        {
-            var error = await response.Content.ReadAsStringAsync();
-            StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to save classroom." : error;
-            IsError = true;
-        }
-
-        IsSubmitting = false;
-    }
-
-    private async Task CreateClassroom()
-    {
-        if (string.IsNullOrWhiteSpace(assignment.GroupId))
-        {
-            StatusMessage = "Please enter a classroom name.";
-            IsError = true;
-            return;
-        }
-
-        IsSubmitting = true;
-        IsError = false;
-        StatusMessage = null;
-
-        var request = new CreateClassroomRequest
-        {
-            GroupId = assignment.GroupId
-        };
-
-        var response = await Http.PostAsJsonAsync("api/admin/classrooms", request);
-        if (response.IsSuccessStatusCode)
-        {
-            StatusMessage = "Classroom created.";
-            await LoadData();
-        }
-        else
-        {
-            var error = await response.Content.ReadAsStringAsync();
-            StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to create classroom." : error;
-            IsError = true;
-        }
-
-        IsSubmitting = false;
     }
 
     private async Task AddTeacherToClassroom()
