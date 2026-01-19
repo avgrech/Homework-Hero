@@ -109,6 +109,48 @@ else
     </section>
 
     <section class="card">
+        <h2>Assign students to a classroom</h2>
+        <p>Connect one or more students to a classroom group and teacher.</p>
+
+        <div class="grid">
+            <div>
+                <label>Classroom / Group ID</label>
+                <InputText @bind-Value="assignmentGroupId" list="classroom-options" @bind-Value:event="oninput" placeholder="Search classrooms" />
+            </div>
+            <div>
+                <label>Teacher</label>
+                <InputSelect @bind-Value="assignmentTeacherId">
+                    <option value="0">Select a teacher</option>
+                    @foreach (var teacher in teachers)
+                    {
+                        <option value="@teacher.Id">@teacher.FirstName @teacher.LastName (@teacher.Email)</option>
+                    }
+                </InputSelect>
+            </div>
+        </div>
+
+        <div>
+            <label>Students</label>
+            <InputText @bind-Value="studentSearch" placeholder="Search students" oninput="oninput" />
+            <div class="grid">
+                @foreach (var student in FilteredStudents)
+                {
+                    <label>
+                        <input type="checkbox"
+                               checked="@selectedStudentIds.Contains(student.Id)"
+                               @onchange="args => ToggleStudentSelection(args, student.Id)" />
+                        @StudentLabel(student)
+                    </label>
+                }
+            </div>
+        </div>
+
+        <div class="button-row">
+            <button type="button" @onclick="AssignStudentsToClassroom" disabled="@IsSubmitting">Assign students</button>
+        </div>
+    </section>
+
+    <section class="card">
         <h2>Edit a classroom</h2>
         <p>Update the classroom name or the primary teacher for classrooms created here.</p>
 
@@ -148,7 +190,9 @@ else
 @code {
     private List<Teacher> teachers = new();
     private List<ClassroomSummaryDto> classrooms = new();
+    private List<Student> students = new();
     private string teacherSearch = string.Empty;
+    private string studentSearch = string.Empty;
 
     private int selectedTeacherId;
     private string selectedClassroomGroup = string.Empty;
@@ -157,6 +201,9 @@ else
     private int? editTeacherId;
     private string newGroupId = string.Empty;
     private int? newTeacherId;
+    private int assignmentTeacherId;
+    private string assignmentGroupId = string.Empty;
+    private HashSet<int> selectedStudentIds = new();
 
     private string? StatusMessage;
     private bool IsError;
@@ -170,6 +217,13 @@ else
             t.FirstName.Contains(teacherSearch, StringComparison.OrdinalIgnoreCase) ||
             t.LastName.Contains(teacherSearch, StringComparison.OrdinalIgnoreCase) ||
             t.Email.Contains(teacherSearch, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<Student> FilteredStudents => string.IsNullOrWhiteSpace(studentSearch)
+        ? students
+        : students.Where(s =>
+            s.FirstName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
+            s.LastName.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) ||
+            s.Email.Contains(studentSearch, StringComparison.OrdinalIgnoreCase));
 
     private IEnumerable<string> ClassroomGroups => classrooms
         .Select(c => c.GroupId)
@@ -194,6 +248,7 @@ else
     private async Task LoadData()
     {
         teachers = await FetchOrEmpty<Teacher>("api/teachers") ?? new();
+        students = await FetchOrEmpty<Student>("api/students") ?? new();
         classrooms = await FetchOrEmpty<ClassroomSummaryDto>("api/admin/classrooms") ?? new();
     }
 
@@ -285,6 +340,79 @@ else
         IsSubmitting = false;
     }
 
+    private void ToggleStudentSelection(ChangeEventArgs args, int studentId)
+    {
+        var isSelected = args?.Value is bool value && value;
+        if (isSelected)
+        {
+            selectedStudentIds.Add(studentId);
+        }
+        else
+        {
+            selectedStudentIds.Remove(studentId);
+        }
+    }
+
+    private static string StudentLabel(Student student) => $"{student.FirstName} {student.LastName} ({student.Email})";
+
+    private async Task AssignStudentsToClassroom()
+    {
+        if (assignmentTeacherId == 0 || string.IsNullOrWhiteSpace(assignmentGroupId) || selectedStudentIds.Count == 0)
+        {
+            StatusMessage = "Please choose a classroom, teacher, and at least one student.";
+            IsError = true;
+            return;
+        }
+
+        IsSubmitting = true;
+        IsError = false;
+        StatusMessage = null;
+
+        var request = new ClassroomAssignmentRequest
+        {
+            TeacherId = assignmentTeacherId,
+            GroupId = assignmentGroupId,
+            StudentIds = selectedStudentIds.ToList()
+        };
+
+        var response = await Http.PostAsJsonAsync("api/admin/classrooms/assign", request);
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<ClassroomAssignmentResult>();
+            if (result is null)
+            {
+                StatusMessage = "Students assigned.";
+            }
+            else
+            {
+                StatusMessage = $"Assigned {result.Assigned} students.";
+                if (result.Reassigned > 0)
+                {
+                    StatusMessage += $" Reassigned {result.Reassigned}.";
+                }
+
+                if (result.MissingStudents.Count > 0)
+                {
+                    StatusMessage += $" Missing {result.MissingStudents.Count} students.";
+                }
+            }
+
+            await LoadData();
+            assignmentTeacherId = 0;
+            assignmentGroupId = string.Empty;
+            selectedStudentIds.Clear();
+            studentSearch = string.Empty;
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            StatusMessage = string.IsNullOrWhiteSpace(error) ? "Unable to assign students to classroom." : error;
+            IsError = true;
+        }
+
+        IsSubmitting = false;
+    }
+
     private void OnEditClassroomChanged(ChangeEventArgs args)
     {
         if (args?.Value is null || !int.TryParse(args.Value.ToString(), out var classroomId))
@@ -344,5 +472,12 @@ else
         }
 
         IsSubmitting = false;
+    }
+
+    private sealed class ClassroomAssignmentResult
+    {
+        public int Assigned { get; set; }
+        public int Reassigned { get; set; }
+        public List<int> MissingStudents { get; set; } = new();
     }
 }
