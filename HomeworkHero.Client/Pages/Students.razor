@@ -31,6 +31,40 @@ else
                 <label>Details</label>
                 <InputTextArea @bind-Value="newStudent.Details" />
 
+                <h4>Conditions</h4>
+                @if (!availableConditions.Any())
+                {
+                    <p class="muted">No conditions available yet.</p>
+                }
+                else
+                {
+                    @for (var i = 0; i < newStudentConditions.Count; i++)
+                    {
+                        var condition = newStudentConditions[i];
+                        <div class="grid" @key="condition">
+                            <div>
+                                <label>Condition</label>
+                                <InputSelect TValue="int" @bind-Value="condition.ConditionId">
+                                    <option value="0">Select condition</option>
+                                    @foreach (var option in availableConditions)
+                                    {
+                                        <option value="@option.Id">@option.Name</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div>
+                                <label>Comments</label>
+                                <InputTextArea @bind-Value="condition.Comments" />
+                            </div>
+                            <div>
+                                <label>&nbsp;</label>
+                                <button type="button" class="secondary" @onclick="() => RemoveNewStudentCondition(condition)">Remove</button>
+                            </div>
+                        </div>
+                    }
+                    <button type="button" class="secondary" @onclick="AddNewStudentCondition">Add condition</button>
+                }
+
                 <button type="submit">Save student</button>
             </div>
         </EditForm>
@@ -53,22 +87,179 @@ else
         @foreach (var student in students)
         {
             <div class="card">
-                <h3>@student.FirstName @student.LastName</h3>
-                <p><strong>Email:</strong> @student.Email</p>
-                <p><strong>Date of birth:</strong> @student.DateOfBirth</p>
-                <p>@student.Details</p>
+                @if (editingStudentId == student.Id)
+                {
+                    <EditForm Model="editStudent" OnValidSubmit="UpdateStudent">
+                        <DataAnnotationsValidator />
+                        <label>First name</label>
+                        <InputText @bind-Value="editStudent.FirstName" />
+
+                        <label>Last name</label>
+                        <InputText @bind-Value="editStudent.LastName" />
+
+                        <label>Email</label>
+                        <InputText @bind-Value="editStudent.Email" />
+
+                        <label>Date of birth</label>
+                        <InputDate @bind-Value="editStudent.DateOfBirth" />
+
+                        <label>Details</label>
+                        <InputTextArea @bind-Value="editStudent.Details" />
+
+                        <h4>Conditions</h4>
+                        @if (student.Conditions.Any())
+                        {
+                            <ul>
+                                @foreach (var condition in student.Conditions)
+                                {
+                                    <li>
+                                        <strong>@(condition.Condition?.Name ?? $"Condition #{condition.ConditionId}")</strong>
+                                        @if (!string.IsNullOrWhiteSpace(condition.Comments))
+                                        {
+                                            <span> - @condition.Comments</span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p class="muted">No conditions listed.</p>
+                        }
+
+                        @if (availableConditions.Any())
+                        {
+                            @for (var i = 0; i < editStudentConditions.Count; i++)
+                            {
+                                var condition = editStudentConditions[i];
+                                <div class="grid" @key="condition">
+                                    <div>
+                                        <label>Condition</label>
+                                        <InputSelect TValue="int" @bind-Value="condition.ConditionId">
+                                            <option value="0">Select condition</option>
+                                            @foreach (var option in availableConditions)
+                                            {
+                                                <option value="@option.Id">@option.Name</option>
+                                            }
+                                        </InputSelect>
+                                    </div>
+                                    <div>
+                                        <label>Comments</label>
+                                        <InputTextArea @bind-Value="condition.Comments" />
+                                    </div>
+                                    <div>
+                                        <label>&nbsp;</label>
+                                        <button type="button" class="secondary" @onclick="() => RemoveEditStudentCondition(condition)">Remove</button>
+                                    </div>
+                                </div>
+                            }
+                            <button type="button" class="secondary" @onclick="AddEditStudentCondition">Add condition</button>
+                        }
+                        else
+                        {
+                            <p class="muted">No conditions available yet.</p>
+                        }
+
+                        <div class="buttons">
+                            <button type="submit">Save changes</button>
+                            <button type="button" class="secondary" @onclick="CancelEdit">Cancel</button>
+                        </div>
+                    </EditForm>
+                }
+                else
+                {
+                    <h3>@student.FirstName @student.LastName</h3>
+                    <p><strong>Email:</strong> @student.Email</p>
+                    <p><strong>Date of birth:</strong> @student.DateOfBirth</p>
+                    <p>@student.Details</p>
+
+                    @if (student.Conditions.Any())
+                    {
+                        <p><strong>Conditions</strong></p>
+                        <ul>
+                            @foreach (var condition in student.Conditions)
+                            {
+                                <li>
+                                    <strong>@(condition.Condition?.Name ?? $"Condition #{condition.ConditionId}")</strong>
+                                    @if (!string.IsNullOrWhiteSpace(condition.Comments))
+                                    {
+                                        <span> - @condition.Comments</span>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+
+                    <div class="buttons">
+                        @if (CanManageStudents)
+                        {
+                            <button type="button" @onclick="() => StartEdit(student)">Edit</button>
+                        }
+                        <button type="button" class="secondary" @onclick="() => OpenTranscripts(student)">View transcripts</button>
+                    </div>
+                }
             </div>
         }
     }
 }
 
+@if (showTranscripts && transcriptStudent is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseTranscripts">
+        <div class="modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>@transcriptStudent.FirstName @transcriptStudent.LastName transcripts</h3>
+                <button class="link" @onclick="CloseTranscripts">Close</button>
+            </div>
+
+            <p><strong>Email:</strong> @transcriptStudent.Email</p>
+            <p><strong>Chat status:</strong> @(transcriptStudent.IsChatBlocked ? "Blocked" : "Active")</p>
+
+            @if (isTranscriptLoading)
+            {
+                <p>Loading transcripts...</p>
+            }
+            else if (!transcriptPrompts.Any())
+            {
+                <p>No AI interactions recorded yet.</p>
+            }
+            else
+            {
+                <div>
+                    @foreach (var prompt in transcriptPrompts)
+                    {
+                        <div class="card">
+                            <p class="muted">@prompt.CreatedAt</p>
+                            <p><strong>Student:</strong> @prompt.PromptText</p>
+                            <p><strong>AI:</strong> @(prompt.ResponseText ?? "No response recorded.")</p>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="modal-actions">
+                <button @onclick="() => ToggleStudentChat(transcriptStudent)">@((transcriptStudent.IsChatBlocked ? "Resume" : "Emergency stop"))</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<Student>? students;
+    private List<Condition> availableConditions = new();
+    private List<StudentPromptDto> transcriptPrompts = new();
+    private List<StudentConditionInput> newStudentConditions = new();
+    private List<StudentConditionInput> editStudentConditions = new();
     private string? accessMessage;
     private Student newStudent = new()
     {
         DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-10))
     };
+    private Student editStudent = new();
+    private int? editingStudentId;
+    private Student? transcriptStudent;
+    private bool showTranscripts;
+    private bool isTranscriptLoading;
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,6 +288,11 @@ else
         }
 
         students = await Http.GetFromJsonAsync<List<Student>>("api/students") ?? new();
+
+        if (CanManageStudents)
+        {
+            availableConditions = await Http.GetFromJsonAsync<List<Condition>>("api/conditions") ?? new();
+        }
     }
 
     private async Task CreateStudent()
@@ -113,15 +309,169 @@ else
             if (created is not null)
             {
                 students ??= new();
+                created.Conditions ??= new List<StudentCondition>();
                 students.Add(created);
+                await AddConditionsAsync(created.Id, newStudentConditions, created);
                 newStudent = new()
                 {
                     DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-10))
                 };
+                newStudentConditions = new();
             }
         }
     }
 
+    private async Task UpdateStudent()
+    {
+        if (editingStudentId is null)
+        {
+            return;
+        }
+
+        var response = await Http.PutAsJsonAsync($"api/students/{editingStudentId.Value}", editStudent);
+        if (!response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var updated = await response.Content.ReadFromJsonAsync<Student>();
+        var existing = students?.FirstOrDefault(s => s.Id == editingStudentId.Value);
+        if (existing is not null)
+        {
+            existing.FirstName = updated?.FirstName ?? editStudent.FirstName;
+            existing.LastName = updated?.LastName ?? editStudent.LastName;
+            existing.Email = updated?.Email ?? editStudent.Email;
+            existing.DateOfBirth = updated?.DateOfBirth ?? editStudent.DateOfBirth;
+            existing.Details = updated?.Details ?? editStudent.Details;
+            await AddConditionsAsync(existing.Id, editStudentConditions, existing);
+        }
+
+        editingStudentId = null;
+        editStudentConditions = new();
+    }
+
+    private void StartEdit(Student student)
+    {
+        if (!CanManageStudents)
+        {
+            return;
+        }
+
+        editingStudentId = student.Id;
+        editStudent = new Student
+        {
+            Id = student.Id,
+            FirstName = student.FirstName,
+            LastName = student.LastName,
+            Email = student.Email,
+            DateOfBirth = student.DateOfBirth,
+            Details = student.Details
+        };
+        editStudentConditions = new();
+    }
+
+    private void CancelEdit()
+    {
+        editingStudentId = null;
+        editStudentConditions = new();
+    }
+
+    private async Task OpenTranscripts(Student student)
+    {
+        transcriptStudent = student;
+        showTranscripts = true;
+        isTranscriptLoading = true;
+        transcriptPrompts = await Http.GetFromJsonAsync<List<StudentPromptDto>>($"api/students/{student.Id}/prompts") ?? new();
+        isTranscriptLoading = false;
+    }
+
+    private void CloseTranscripts()
+    {
+        showTranscripts = false;
+        transcriptStudent = null;
+        transcriptPrompts = new();
+        isTranscriptLoading = false;
+    }
+
+    private async Task ToggleStudentChat(Student student)
+    {
+        var response = await Http.PostAsJsonAsync($"api/students/{student.Id}/flag", new FlagStudentRequest(!student.IsChatBlocked, null));
+        if (response.IsSuccessStatusCode)
+        {
+            student.IsChatBlocked = !student.IsChatBlocked;
+        }
+    }
+
+    private void AddNewStudentCondition()
+    {
+        newStudentConditions.Add(new StudentConditionInput());
+    }
+
+    private void RemoveNewStudentCondition(StudentConditionInput condition)
+    {
+        newStudentConditions.Remove(condition);
+    }
+
+    private void AddEditStudentCondition()
+    {
+        editStudentConditions.Add(new StudentConditionInput());
+    }
+
+    private void RemoveEditStudentCondition(StudentConditionInput condition)
+    {
+        editStudentConditions.Remove(condition);
+    }
+
+    private async Task AddConditionsAsync(int studentId, List<StudentConditionInput> conditionInputs, Student? targetStudent)
+    {
+        if (!conditionInputs.Any())
+        {
+            return;
+        }
+
+        var existingConditionIds = targetStudent?.Conditions.Select(c => c.ConditionId).ToHashSet() ?? new HashSet<int>();
+        var failedConditions = new List<StudentConditionInput>();
+
+        foreach (var conditionInput in conditionInputs.Where(c => c.ConditionId > 0))
+        {
+            if (existingConditionIds.Contains(conditionInput.ConditionId))
+            {
+                continue;
+            }
+
+            var payload = new StudentCondition
+            {
+                ConditionId = conditionInput.ConditionId,
+                Comments = conditionInput.Comments ?? string.Empty
+            };
+
+            var response = await Http.PostAsJsonAsync($"api/students/{studentId}/conditions", payload);
+            if (!response.IsSuccessStatusCode)
+            {
+                failedConditions.Add(conditionInput);
+                continue;
+            }
+
+            var created = await response.Content.ReadFromJsonAsync<StudentCondition>();
+            if (created is not null && targetStudent is not null)
+            {
+                created.Condition = availableConditions.FirstOrDefault(c => c.Id == created.ConditionId);
+                targetStudent.Conditions.Add(created);
+                existingConditionIds.Add(created.ConditionId);
+            }
+        }
+
+        conditionInputs.Clear();
+        conditionInputs.AddRange(failedConditions);
+    }
+
     private bool CanCreateStudents => string.Equals(Auth.Role, "Admin", StringComparison.OrdinalIgnoreCase);
     private bool IsTeacher => string.Equals(Auth.Role, "Teacher", StringComparison.OrdinalIgnoreCase);
+    private bool CanManageStudents => CanCreateStudents;
+
+    private sealed class StudentConditionInput
+    {
+        public int ConditionId { get; set; }
+        public string Comments { get; set; } = string.Empty;
+    }
 }
