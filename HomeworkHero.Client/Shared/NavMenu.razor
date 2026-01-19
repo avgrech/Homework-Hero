@@ -7,10 +7,6 @@
             <div class="user-name">@UserLabel</div>
             <div class="user-role">@UserRole</div>
         </div>
-        @if (authState.IsAuthenticated)
-        {
-            <button class="link logout" @onclick="Logout">Logout</button>
-        }
     </div>
 
     <nav class="sidebar-nav">
@@ -124,11 +120,6 @@
     private void Refresh()
     {
         InvokeAsync(StateHasChanged);
-    }
-
-    private async Task Logout()
-    {
-        await authState.ClearAsync();
     }
 
     public void Dispose()
