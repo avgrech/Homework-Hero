@@ -413,6 +413,18 @@ button.secondary {
     border: 1px solid var(--border-subtle);
 }
 
+.submitted-badge {
+    align-self: flex-start;
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    background: var(--success);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
 .homework-card.status-overdue {
     border-color: var(--danger);
     background: rgba(239, 68, 68, 0.08);
@@ -428,6 +440,11 @@ button.secondary {
     background: rgba(34, 197, 94, 0.08);
 }
 
+.homework-card.status-submitted {
+    border-color: var(--success);
+    background: rgba(34, 197, 94, 0.14);
+}
+
 .homework-card.status-overdue .status-chip {
     background: var(--danger);
     color: #fff;
@@ -435,6 +452,11 @@ button.secondary {
 
 .homework-card.status-soon .status-chip {
     background: var(--warning);
+    color: #fff;
+}
+
+.homework-card.status-submitted .status-chip {
+    background: var(--success);
     color: #fff;
 }
 
