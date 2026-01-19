@@ -679,6 +679,7 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
             st.Teacher.LastName
         })
         .Select(g => new ClassroomSummaryDto(
+            null,
             g.Key.GroupId,
             g.Key.TeacherId,
             $"{g.Key.FirstName} {g.Key.LastName}",
@@ -697,6 +698,7 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
     var manualClassrooms = await db.Classrooms
         .Include(c => c.Teacher)
         .Select(c => new ClassroomSummaryDto(
+            c.Id,
             c.GroupId,
             c.TeacherId,
             c.Teacher == null ? "Unassigned" : $"{c.Teacher.FirstName} {c.Teacher.LastName}",
@@ -707,6 +709,7 @@ admin.MapGet("/classrooms", async (HomeworkHeroContext db) =>
         .Concat(manualClassrooms)
         .GroupBy(c => new { c.GroupId, c.TeacherId, c.TeacherName })
         .Select(g => new ClassroomSummaryDto(
+            g.Max(x => x.ClassroomId),
             g.Key.GroupId,
             g.Key.TeacherId,
             g.Key.TeacherName,
@@ -764,6 +767,42 @@ admin.MapPost("/classrooms", async (CreateClassroomRequest request, HomeworkHero
     await db.SaveChangesAsync();
 
     return Results.Created($"/api/admin/classrooms/{classroom.Id}", classroom);
+});
+
+admin.MapPut("/classrooms/{id:int}", async (int id, UpdateClassroomRequest request, HomeworkHeroContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(request.GroupId))
+    {
+        return Results.BadRequest("A classroom name is required.");
+    }
+
+    var classroom = await db.Classrooms.FindAsync(id);
+    if (classroom is null)
+    {
+        return Results.NotFound("Classroom not found.");
+    }
+
+    var duplicate = await db.Classrooms.AnyAsync(c => c.GroupId == request.GroupId && c.Id != id);
+    if (duplicate)
+    {
+        return Results.Conflict("Another classroom already uses this name.");
+    }
+
+    Teacher? teacher = null;
+    if (request.TeacherId.HasValue && request.TeacherId.Value != 0)
+    {
+        teacher = await db.Teachers.FindAsync(request.TeacherId.Value);
+        if (teacher is null)
+        {
+            return Results.NotFound("Teacher not found.");
+        }
+    }
+
+    classroom.GroupId = request.GroupId;
+    classroom.TeacherId = teacher?.Id;
+
+    await db.SaveChangesAsync();
+    return Results.Ok(classroom);
 });
 
 admin.MapPost("/classrooms/assign", async (ClassroomAssignmentRequest request, HomeworkHeroContext db) =>

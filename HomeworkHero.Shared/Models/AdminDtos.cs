@@ -1,8 +1,15 @@
 namespace HomeworkHero.Shared.Models;
 
-public record ClassroomSummaryDto(string GroupId, int? TeacherId, string TeacherName, List<StudentSummaryDto> Students);
+public record ClassroomSummaryDto(int? ClassroomId, string GroupId, int? TeacherId, string TeacherName, List<StudentSummaryDto> Students);
 
 public class CreateClassroomRequest
+{
+    public string GroupId { get; set; } = string.Empty;
+
+    public int? TeacherId { get; set; }
+}
+
+public class UpdateClassroomRequest
 {
     public string GroupId { get; set; } = string.Empty;
 
