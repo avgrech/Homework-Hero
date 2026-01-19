@@ -149,9 +149,9 @@ else
             <p><strong>Student:</strong> @hw.AssignedStudentId</p>
             <p><strong>Date given:</strong> @hw.DateAssigned</p>
             <p><strong>Due date:</strong> @hw.DueDate</p>
+            <p><strong>Submissions:</strong> @GetSubmittedCount(hw) submitted • @GetPendingCount(hw) pending</p>
             @if (IsTeacher)
             {
-                <p><strong>Submissions:</strong> @GetSubmittedCount(hw) submitted • @GetPendingCount(hw) pending</p>
                 <button class="secondary" @onclick="() => OpenResultsModal(hw)">View student homework</button>
             }
             <div class="homework-content">@RenderHtml(hw.TextContent)</div>
@@ -385,11 +385,6 @@ else
     private async Task LoadHomeworkResults()
     {
         homeworkResults.Clear();
-
-        if (!IsTeacher)
-        {
-            return;
-        }
 
         var tasks = homeworkItems.Select(async item =>
         {
