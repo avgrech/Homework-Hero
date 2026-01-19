@@ -190,6 +190,25 @@ public class HomeworkResult
 
     public decimal? Score { get; set; }
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
+    public ICollection<StudentCorrection> StudentCorrections { get; set; } = new List<StudentCorrection>();
+}
+
+public class StudentCorrection
+{
+    public int Id { get; set; }
+
+    public int HomeworkResultId { get; set; }
+    public HomeworkResult? HomeworkResult { get; set; }
+
+    public int TeacherId { get; set; }
+    public Teacher? Teacher { get; set; }
+
+    public decimal? Mark { get; set; }
+
+    [MaxLength(2000)]
+    public string Notes { get; set; } = string.Empty;
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public enum UserRole

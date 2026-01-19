@@ -494,6 +494,28 @@ homework.MapGet("/{id:int}/details/{studentId:int}", async (int id, int studentI
 
     return Results.Ok(detail);
 });
+homework.MapGet("/{id:int}/results", async (int id, HomeworkHeroContext db) =>
+{
+    if (!await db.HomeworkItems.AnyAsync(h => h.Id == id))
+    {
+        return Results.NotFound();
+    }
+
+    var results = await db.HomeworkResults
+        .Where(r => r.HomeworkItemId == id)
+        .Include(r => r.Student)
+        .OrderByDescending(r => r.SubmittedAt)
+        .Select(r => new HomeworkResultStudentDto(
+            r.Id,
+            r.StudentId,
+            r.Student != null ? $"{r.Student.FirstName} {r.Student.LastName}" : $"Student {r.StudentId}",
+            r.SubmittedAt,
+            r.ResultText,
+            r.ResultImageUrl))
+        .ToListAsync();
+
+    return Results.Ok(results);
+});
 homework.MapPost("/", async (HomeworkItem item, HomeworkHeroContext db) =>
 {
     if (string.IsNullOrWhiteSpace(item.Subject))
@@ -514,6 +536,41 @@ homework.MapPost("/", async (HomeworkItem item, HomeworkHeroContext db) =>
     db.HomeworkItems.Add(item);
     await db.SaveChangesAsync();
     return Results.Created($"/api/homework/{item.Id}", item);
+});
+
+var homeworkResults = app.MapGroup("/api/homework-results");
+homeworkResults.MapPost("/{resultId:int}/corrections", async (int resultId, StudentCorrectionRequest request, HomeworkHeroContext db) =>
+{
+    if (!await db.HomeworkResults.AnyAsync(r => r.Id == resultId))
+    {
+        return Results.NotFound("Homework result not found.");
+    }
+
+    if (!await db.Teachers.AnyAsync(t => t.Id == request.TeacherId))
+    {
+        return Results.BadRequest("Teacher not found.");
+    }
+
+    var correction = new StudentCorrection
+    {
+        HomeworkResultId = resultId,
+        TeacherId = request.TeacherId,
+        Mark = request.Mark,
+        Notes = request.Notes ?? string.Empty
+    };
+
+    db.StudentCorrections.Add(correction);
+    await db.SaveChangesAsync();
+
+    var dto = new StudentCorrectionDto(
+        correction.Id,
+        correction.HomeworkResultId,
+        correction.TeacherId,
+        correction.Mark,
+        correction.Notes,
+        correction.CreatedAt);
+
+    return Results.Created($"/api/homework-results/{resultId}/corrections/{correction.Id}", dto);
 });
 
 homework.MapPost("/{id:int}/actions", async (int id, StudentAction action, HomeworkHeroContext db) =>

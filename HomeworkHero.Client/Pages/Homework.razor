@@ -149,6 +149,11 @@ else
             <p><strong>Student:</strong> @hw.AssignedStudentId</p>
             <p><strong>Date given:</strong> @hw.DateAssigned</p>
             <p><strong>Due date:</strong> @hw.DueDate</p>
+            @if (IsTeacher)
+            {
+                <p><strong>Submissions:</strong> @GetSubmittedCount(hw) submitted • @GetPendingCount(hw) pending</p>
+                <button class="secondary" @onclick="() => OpenResultsModal(hw)">View student homework</button>
+            }
             <div class="homework-content">@RenderHtml(hw.TextContent)</div>
             @if (!string.IsNullOrWhiteSpace(hw.ImageUrl))
             {
@@ -158,12 +163,102 @@ else
     }
 }
 
+@if (showResultsModal && selectedHomework is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseResultsModal">
+        <div class="modal-panel" @onclick:stopPropagation>
+            <header class="modal-header">
+                <div>
+                    <p class="eyebrow">Student submissions</p>
+                    <h3>@selectedHomework.Title</h3>
+                </div>
+                <button class="ghost" @onclick="CloseResultsModal" aria-label="Close">✕</button>
+            </header>
+
+            @if (!selectedResults.Any())
+            {
+                <p>No submissions yet.</p>
+            }
+            else
+            {
+                <div class="stacked-form">
+                    @foreach (var result in selectedResults)
+                    {
+                        <div class="card">
+                            <p><strong>@result.StudentName</strong></p>
+                            <p class="muted">Submitted @result.SubmittedAt.ToString("yyyy-MM-dd HH:mm")</p>
+                            <button class="primary" @onclick="() => OpenCorrectionModal(result)">Correct homework</button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@if (showCorrectionModal && selectedHomework is not null && selectedSubmission is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseCorrectionModal">
+        <div class="modal-panel" @onclick:stopPropagation>
+            <header class="modal-header">
+                <div>
+                    <p class="eyebrow">Correction</p>
+                    <h3>@selectedSubmission.StudentName</h3>
+                </div>
+                <button class="ghost" @onclick="CloseCorrectionModal" aria-label="Close">✕</button>
+            </header>
+
+            <div class="stacked-form">
+                <div>
+                    <p class="muted">Homework</p>
+                    <div class="homework-content">@RenderHtml(selectedHomework.TextContent)</div>
+                </div>
+                <div>
+                    <p class="muted">Submission</p>
+                    @if (!string.IsNullOrWhiteSpace(selectedSubmission.ResultText))
+                    {
+                        <div class="homework-content">@RenderHtml(selectedSubmission.ResultText)</div>
+                    }
+                    else
+                    {
+                        <p>No written submission.</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(selectedSubmission.ResultImageUrl))
+                    {
+                        <p><a href="@selectedSubmission.ResultImageUrl" target="_blank">View submitted image</a></p>
+                    }
+                </div>
+            </div>
+
+            <EditForm Model="correctionForm" OnValidSubmit="SubmitCorrection" class="stacked-form">
+                <div class="form-row">
+                    <label>Mark</label>
+                    <InputNumber class="text-input" TValue="decimal?" @bind-Value="correctionForm.Mark" />
+                </div>
+                <div class="form-row">
+                    <label>Notes</label>
+                    <InputTextArea class="text-input" @bind-Value="correctionForm.Notes" />
+                </div>
+                @if (!string.IsNullOrWhiteSpace(correctionStatus))
+                {
+                    <p class="muted">@correctionStatus</p>
+                }
+                <div class="form-actions">
+                    <button type="button" class="ghost" @onclick="CloseCorrectionModal">Cancel</button>
+                    <button type="submit" class="primary" disabled="@isSavingCorrection">Save correction</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
 @code {
     private List<Teacher> teachers = new();
     private List<HomeworkItem> homeworkItems = new();
     private List<GroupSummaryDto> groups = new();
     private List<StudentSummaryDto> students = new();
     private List<StudentSummaryDto> allStudents = new();
+    private readonly Dictionary<int, List<HomeworkResultStudentDto>> homeworkResults = new();
     private static readonly List<string> subjects = new() { "Math", "Science", "History", "Language Arts", "Social Studies", "Art", "Music", "PE", "Other" };
 
     private HomeworkItem newHomework = new()
@@ -185,6 +280,14 @@ else
     private bool editorInitialized;
     private ElementReference textEditorElement;
     private DotNetObjectReference<Homework>? dotNetRef;
+    private HomeworkItem? selectedHomework;
+    private List<HomeworkResultStudentDto> selectedResults = new();
+    private HomeworkResultStudentDto? selectedSubmission;
+    private bool showResultsModal;
+    private bool showCorrectionModal;
+    private CorrectionForm correctionForm = new();
+    private bool isSavingCorrection;
+    private string? correctionStatus;
 
     private IEnumerable<Teacher> FilteredTeachers => teachers
         .Where(t => t.Id == newHomework.TeacherId
@@ -222,6 +325,7 @@ else
         await LoadStudents();
         await LoadTeachers();
         await LoadHomework();
+        await LoadHomeworkResults();
     }
 
     private async Task LoadTeachers()
@@ -278,6 +382,28 @@ else
         homeworkItems = await Http.GetFromJsonAsync<List<HomeworkItem>>("api/homework") ?? new();
     }
 
+    private async Task LoadHomeworkResults()
+    {
+        homeworkResults.Clear();
+
+        if (!IsTeacher)
+        {
+            return;
+        }
+
+        var tasks = homeworkItems.Select(async item =>
+        {
+            var results = await Http.GetFromJsonAsync<List<HomeworkResultStudentDto>>($"api/homework/{item.Id}/results") ?? new();
+            return (item.Id, Results: results);
+        });
+
+        var resultsByHomework = await Task.WhenAll(tasks);
+        foreach (var entry in resultsByHomework)
+        {
+            homeworkResults[entry.Id] = entry.Results;
+        }
+    }
+
     private async Task CreateHomework()
     {
         if (!CanCreateHomework)
@@ -298,6 +424,7 @@ else
             if (created is not null)
             {
                 homeworkItems.Add(created);
+                homeworkResults[created.Id] = new List<HomeworkResultStudentDto>();
                 newHomework = new()
                 {
                     DateAssigned = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -475,6 +602,105 @@ else
     private bool IsStudent => string.Equals(Auth.Role, "Student", StringComparison.OrdinalIgnoreCase);
     private bool CanCreateHomework => !IsStudent && (!IsTeacher || Auth.TeacherId.HasValue);
 
+    private int GetSubmittedCount(HomeworkItem item)
+    {
+        return homeworkResults.TryGetValue(item.Id, out var results) ? results.Count : 0;
+    }
+
+    private int GetPendingCount(HomeworkItem item)
+    {
+        var assigned = GetAssignedStudents(item);
+        var submittedIds = homeworkResults.TryGetValue(item.Id, out var results)
+            ? results.Select(r => r.StudentId).ToHashSet()
+            : new HashSet<int>();
+
+        var pendingCount = assigned.Count(s => !submittedIds.Contains(s.Id));
+        return pendingCount;
+    }
+
+    private List<StudentSummaryDto> GetAssignedStudents(HomeworkItem item)
+    {
+        if (item.AssignedStudentId.HasValue)
+        {
+            return allStudents.Where(s => s.Id == item.AssignedStudentId.Value).ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.AssignedGroupId))
+        {
+            var group = groups.FirstOrDefault(g => g.GroupId == item.AssignedGroupId);
+            if (group is not null)
+            {
+                return new List<StudentSummaryDto>(group.Students);
+            }
+        }
+
+        return new List<StudentSummaryDto>(allStudents);
+    }
+
+    private async Task OpenResultsModal(HomeworkItem item)
+    {
+        selectedHomework = item;
+        showResultsModal = true;
+        await RefreshHomeworkResults(item.Id);
+        selectedResults = homeworkResults.TryGetValue(item.Id, out var results)
+            ? new List<HomeworkResultStudentDto>(results)
+            : new List<HomeworkResultStudentDto>();
+    }
+
+    private void CloseResultsModal()
+    {
+        showResultsModal = false;
+        showCorrectionModal = false;
+        selectedHomework = null;
+        selectedResults = new();
+    }
+
+    private void OpenCorrectionModal(HomeworkResultStudentDto result)
+    {
+        selectedSubmission = result;
+        correctionForm = new CorrectionForm();
+        correctionStatus = null;
+        showCorrectionModal = true;
+    }
+
+    private void CloseCorrectionModal()
+    {
+        showCorrectionModal = false;
+        selectedSubmission = null;
+        correctionForm = new CorrectionForm();
+    }
+
+    private async Task RefreshHomeworkResults(int homeworkId)
+    {
+        var results = await Http.GetFromJsonAsync<List<HomeworkResultStudentDto>>($"api/homework/{homeworkId}/results") ?? new();
+        homeworkResults[homeworkId] = results;
+    }
+
+    private async Task SubmitCorrection()
+    {
+        if (!IsTeacher || !Auth.TeacherId.HasValue || selectedSubmission is null)
+        {
+            return;
+        }
+
+        isSavingCorrection = true;
+        correctionStatus = null;
+
+        var request = new StudentCorrectionRequest(correctionForm.Mark, correctionForm.Notes, Auth.TeacherId.Value);
+        var response = await Http.PostAsJsonAsync($"api/homework-results/{selectedSubmission.HomeworkResultId}/corrections", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            correctionStatus = "Correction saved.";
+        }
+        else
+        {
+            correctionStatus = "We couldn't save that correction. Please try again.";
+        }
+
+        isSavingCorrection = false;
+    }
+
     private MarkupString RenderHtml(string? content)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -483,5 +709,11 @@ else
         }
 
         return new MarkupString(content);
+    }
+
+    private class CorrectionForm
+    {
+        public decimal? Mark { get; set; }
+        public string? Notes { get; set; }
     }
 }
