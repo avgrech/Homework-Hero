@@ -315,7 +315,7 @@ input,
 textarea,
 select,
 button {
-    padding: 0.55rem 0.65rem;
+    padding: 5px;
     font-size: 1rem;
     border-radius: 10px;
     border: 1px solid var(--border-subtle);
@@ -484,7 +484,7 @@ button.secondary {
 .form-row select,
 .form-row textarea {
     width: 100%;
-    padding: 0.85rem 0.9rem;
+    padding: 5px;
     border-radius: 10px;
     border: 1px solid var(--border-strong);
     background: var(--bg-surface-alt);
