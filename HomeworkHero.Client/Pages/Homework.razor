@@ -150,7 +150,7 @@ else
             <p><strong>Date given:</strong> @hw.DateAssigned</p>
             <p><strong>Due date:</strong> @hw.DueDate</p>
             <p><strong>Submissions:</strong> @GetSubmittedCount(hw) submitted • @GetPendingCount(hw) pending</p>
-            @if (IsTeacher)
+            @if (!IsStudent)
             {
                 <button class="secondary" @onclick="() => OpenSubmittedModal(hw)">View submitted homework</button>
                 <button class="secondary" @onclick="() => OpenResultsModal(hw)">View student homework</button>
