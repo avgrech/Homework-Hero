@@ -72,6 +72,7 @@ app.UseSwaggerUI(options =>
 var students = app.MapGroup("/api/students");
 students.MapGet("/", async (HomeworkHeroContext db) => await db.Students
         .Include(s => s.Conditions)
+        .ThenInclude(sc => sc.Condition)
         .Include(s => s.Enrollments)
         .ToListAsync());
 
@@ -89,6 +90,24 @@ students.MapPost("/", async (Student student, HomeworkHeroContext db) =>
     await db.SaveChangesAsync();
     await EnsureUserForStudentAsync(student, db);
     return Results.Created($"/api/students/{student.Id}", student);
+});
+
+students.MapPut("/{id:int}", async (int id, Student updatedStudent, HomeworkHeroContext db) =>
+{
+    var existing = await db.Students.FindAsync(id);
+    if (existing is null)
+    {
+        return Results.NotFound();
+    }
+
+    existing.FirstName = updatedStudent.FirstName;
+    existing.LastName = updatedStudent.LastName;
+    existing.Email = updatedStudent.Email;
+    existing.DateOfBirth = updatedStudent.DateOfBirth;
+    existing.Details = updatedStudent.Details;
+
+    await db.SaveChangesAsync();
+    return Results.Ok(existing);
 });
 
 students.MapPost("/{id:int}/conditions", async (int id, StudentCondition condition, HomeworkHeroContext db) =>
