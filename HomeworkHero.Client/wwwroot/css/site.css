@@ -548,6 +548,37 @@ button.secondary {
     margin-top: 0.5rem;
 }
 
+.correction-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr);
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.correction-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.correction-form {
+    align-self: start;
+}
+
+@media (max-width: 900px) {
+    .correction-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .correction-content {
+        max-height: none;
+        padding-right: 0;
+    }
+}
+
 .ghost {
     background: transparent;
     border: 1px solid var(--border-strong);
