@@ -152,7 +152,7 @@ else
             <p><strong>Submissions:</strong> @GetSubmittedCount(hw) submitted • @GetPendingCount(hw) pending</p>
             @if (!IsStudent)
             {
-                <button class="secondary" @onclick="() => OpenSubmittedModal(hw)">View submitted homework</button>
+                
                 <button class="secondary" @onclick="() => OpenResultsModal(hw)">View student homework</button>
             }
             <div class="homework-content">@RenderHtml(hw.TextContent)</div>
