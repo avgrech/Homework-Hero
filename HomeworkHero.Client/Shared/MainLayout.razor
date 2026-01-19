@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @inject IJSRuntime JS
+@inject AuthState authState
 
 <PageTitle>Homework Hero</PageTitle>
 
@@ -13,6 +14,13 @@
             </div>
         </div>
         <div class="header-actions">
+            @if (authState.IsAuthenticated)
+            {
+                <button class="pill-button logout-button" type="button" @onclick="Logout">
+                    <span class="pill-icon" aria-hidden="true">🚪</span>
+                    <span>Logout</span>
+                </button>
+            }
             <button class="pill-button" type="button" @onclick="ToggleTheme">
                 <span class="pill-icon" aria-hidden="true">@(isDark ? "🌙" : "☀️")</span>
                 <span>@(isDark ? "Dark" : "Light") mode</span>
@@ -56,5 +64,10 @@
 
         isDark = !isDark;
         await JS.InvokeVoidAsync("themeStore.setTheme", CurrentTheme);
+    }
+
+    private async Task Logout()
+    {
+        await authState.ClearAsync();
     }
 }
