@@ -1,6 +1,7 @@
 using HomeworkHero.Api.Data;
 using HomeworkHero.Shared.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
 using System.IO;
 using System.Security.Cryptography;
@@ -343,7 +344,7 @@ conditions.MapPut("/{id:int}", async (int id, ConditionUpdateRequest request, Ho
         condition.Description,
         assignedCount));
 });
-conditions.MapDelete("/{id:int}", async (int id, ConditionDeleteRequest? request, HomeworkHeroContext db) =>
+conditions.MapDelete("/{id:int}", async (int id, [FromBody] ConditionDeleteRequest? request, HomeworkHeroContext db) =>
 {
     var condition = await db.Conditions.FirstOrDefaultAsync(c => c.Id == id);
     if (condition is null)
