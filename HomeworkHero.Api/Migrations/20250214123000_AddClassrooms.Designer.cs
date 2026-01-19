@@ -4,16 +4,18 @@ using HomeworkHero.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace HomeworkHero.Api.Migrations
 {
     [DbContext(typeof(HomeworkHeroContext))]
-    partial class HomeworkHeroContextModelSnapshot : ModelSnapshot
+    [Migration("20250214123000_AddClassrooms")]
+    partial class AddClassrooms
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
