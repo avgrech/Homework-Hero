@@ -150,8 +150,9 @@ else
             <p><strong>Date given:</strong> @hw.DateAssigned</p>
             <p><strong>Due date:</strong> @hw.DueDate</p>
             <p><strong>Submissions:</strong> @GetSubmittedCount(hw) submitted • @GetPendingCount(hw) pending</p>
-            @if (IsTeacher)
+            @if (!IsStudent)
             {
+                <button class="secondary" @onclick="() => OpenSubmittedModal(hw)">View submitted homework</button>
                 <button class="secondary" @onclick="() => OpenResultsModal(hw)">View student homework</button>
             }
             <div class="homework-content">@RenderHtml(hw.TextContent)</div>
@@ -161,6 +162,35 @@ else
             }
         </div>
     }
+}
+
+@if (showSubmittedModal && selectedHomework is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseSubmittedModal">
+        <div class="modal-panel" @onclick:stopPropagation>
+            <header class="modal-header">
+                <div>
+                    <p class="eyebrow">Submitted homework</p>
+                    <h3>@selectedHomework.Title</h3>
+                </div>
+                <button class="ghost" @onclick="CloseSubmittedModal" aria-label="Close">✕</button>
+            </header>
+
+            @if (!submittedStudentNames.Any())
+            {
+                <p>No submissions yet.</p>
+            }
+            else
+            {
+                <ul class="stacked-form">
+                    @foreach (var studentName in submittedStudentNames)
+                    {
+                        <li class="card">@studentName</li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
 }
 
 @if (showResultsModal && selectedHomework is not null)
@@ -284,10 +314,12 @@ else
     private List<HomeworkResultStudentDto> selectedResults = new();
     private HomeworkResultStudentDto? selectedSubmission;
     private bool showResultsModal;
+    private bool showSubmittedModal;
     private bool showCorrectionModal;
     private CorrectionForm correctionForm = new();
     private bool isSavingCorrection;
     private string? correctionStatus;
+    private List<string> submittedStudentNames = new();
 
     private IEnumerable<Teacher> FilteredTeachers => teachers
         .Where(t => t.Id == newHomework.TeacherId
@@ -648,6 +680,23 @@ else
         showCorrectionModal = false;
         selectedHomework = null;
         selectedResults = new();
+    }
+
+    private async Task OpenSubmittedModal(HomeworkItem item)
+    {
+        selectedHomework = item;
+        showSubmittedModal = true;
+        await RefreshHomeworkResults(item.Id);
+        submittedStudentNames = homeworkResults.TryGetValue(item.Id, out var results)
+            ? results.Select(r => r.StudentName).ToList()
+            : new List<string>();
+    }
+
+    private void CloseSubmittedModal()
+    {
+        showSubmittedModal = false;
+        selectedHomework = null;
+        submittedStudentNames = new();
     }
 
     private void OpenCorrectionModal(HomeworkResultStudentDto result)
