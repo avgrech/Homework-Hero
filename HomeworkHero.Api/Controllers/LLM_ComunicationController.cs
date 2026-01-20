@@ -80,7 +80,7 @@ public class LLM_ComunicationController : ControllerBase
         request.Request.ApiKey = _llmApiKey;
         request.Request.ChatHistory = await BuildChatHistoryAsync(request, systemPrompt);
 
-        using var response = await _httpClient.PostAsJsonAsync(_llmApiUrl, request.Request);
+         using var response = await _httpClient.PostAsJsonAsync(_llmApiUrl, request.Request);
         if (!response.IsSuccessStatusCode)
         {
             return await RespondWithPromptAsync(prompt, (int)response.StatusCode, "LLM API call failed.");
