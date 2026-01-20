@@ -211,6 +211,17 @@ public class StudentCorrection
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+public class Paramiter
+{
+    public int Id { get; set; }
+
+    [Required, MaxLength(100)]
+    public string Name { get; set; } = string.Empty;
+
+    [Required, MaxLength(4000)]
+    public string Value { get; set; } = string.Empty;
+}
+
 public enum UserRole
 {
     Student,

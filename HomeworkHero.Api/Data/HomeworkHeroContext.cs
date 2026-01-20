@@ -24,6 +24,7 @@ public class HomeworkHeroContext : DbContext
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<Paramiter> Paramiters => Set<Paramiter>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -95,6 +96,10 @@ public class HomeworkHeroContext : DbContext
 
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Email)
+            .IsUnique();
+
+        modelBuilder.Entity<Paramiter>()
+            .HasIndex(p => p.Name)
             .IsUnique();
 
         modelBuilder.Entity<User>()
