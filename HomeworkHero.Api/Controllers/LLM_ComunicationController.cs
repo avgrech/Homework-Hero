@@ -15,6 +15,8 @@ public class LLM_ComunicationController : ControllerBase
     private readonly HomeworkHeroContext _db;
     private readonly string? _llmApiUrl;
     private readonly string? _llmApiKey;
+    private readonly string? _llmProvider;
+    private readonly string? _llmModel;
     private readonly IPromptBuilder _promptBuilder;
 
     public LLM_ComunicationController(HttpClient httpClient, HomeworkHeroContext db, IConfiguration configuration, IPromptBuilder promptBuilder)
@@ -23,6 +25,8 @@ public class LLM_ComunicationController : ControllerBase
         _db = db;
         _llmApiUrl = configuration["LLMApi:Url"];
         _llmApiKey = configuration["LLMApi:ApiKey"];
+        _llmProvider = configuration["LLMApi:Provider"];
+        _llmModel = configuration["LLMApi:Model"];
         _promptBuilder = promptBuilder;
     }
 
@@ -62,6 +66,11 @@ public class LLM_ComunicationController : ControllerBase
             return await RespondWithPromptAsync(prompt, StatusCodes.Status500InternalServerError, "LLM API key is not configured.");
         }
 
+        if (string.IsNullOrWhiteSpace(_llmProvider) || string.IsNullOrWhiteSpace(_llmModel))
+        {
+            return await RespondWithPromptAsync(prompt, StatusCodes.Status500InternalServerError, "LLM provider or model is not configured.");
+        }
+
         if (request.Request is null)
         {
             return await RespondWithPromptAsync(prompt, StatusCodes.Status400BadRequest, "LLM request payload is missing.");
@@ -78,6 +87,8 @@ public class LLM_ComunicationController : ControllerBase
         }
 
         request.Request.ApiKey = _llmApiKey;
+        request.Request.Provider = _llmProvider;
+        request.Request.Model = _llmModel;
         request.Request.ChatHistory = await BuildChatHistoryAsync(request, systemPrompt);
 
          using var response = await _httpClient.PostAsJsonAsync(_llmApiUrl, request.Request);
