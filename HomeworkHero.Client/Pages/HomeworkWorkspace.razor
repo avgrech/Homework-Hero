@@ -4,6 +4,7 @@
 @using HomeworkHero.Shared.Models
 @inject HttpClient Http
 @inject AuthState Auth
+@inject IJSRuntime JS
 
 <h1>Homework workspace</h1>
 <p>Review the assignment, add your work, and use the chat to ask for help as you go.</p>
@@ -81,7 +82,7 @@ else
                     <h3>Chat</h3>
                     <p class="muted">Send a question or update for the AI helper.</p>
                 </div>
-                <div class="chat-window">
+                <div class="chat-window" @ref="chatWindow">
                     @foreach (var message in messages.OrderBy(m => m.Timestamp))
                     {
                         <div class="chat-message @(message.IsUser ? "from-user" : "from-helper")">
@@ -96,7 +97,9 @@ else
                 <EditForm Model="chatInput" OnValidSubmit="SendMessage">
                     <DataAnnotationsValidator />
                     <div class="chat-input">
-                        <InputTextArea @bind-Value="chatInput.Message" placeholder="Ask for help or share your progress" />
+                        <InputTextArea @bind-Value="chatInput.Message"
+                                       placeholder="Ask for help or share your progress"
+                                       @onkeydown="HandleChatKeyDown" />
                         <button type="submit">Send</button>
                     </div>
                 </EditForm>
@@ -126,6 +129,8 @@ else
     private string submissionStatus = string.Empty;
     private bool submissionHadError;
     private bool isSubmitting;
+    private ElementReference chatWindow;
+    private int lastMessageCount;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -219,6 +224,25 @@ else
         catch (HttpRequestException)
         {
             messages.Add(new ChatMessage("AI helper", "I couldn't reach the AI service. Please check your connection and try again."));
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (messages.Count == lastMessageCount)
+        {
+            return;
+        }
+
+        lastMessageCount = messages.Count;
+        await JS.InvokeVoidAsync("chatHelpers.scrollToBottom", chatWindow);
+    }
+
+    private async Task HandleChatKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter" && !args.ShiftKey)
+        {
+            await SendMessage();
         }
     }
 
