@@ -114,6 +114,7 @@ else
     private List<Teacher> teachers = new();
     private bool isLoading = true;
     private string loadError = string.Empty;
+    private readonly string chatSessionId = Guid.NewGuid().ToString("N");
 
     private List<ChatMessage> messages = new()
     {
@@ -168,18 +169,31 @@ else
             return;
         }
 
+        if (!Auth.StudentId.HasValue || homework is null)
+        {
+            messages.Add(new ChatMessage("AI helper", "Select a homework item and make sure you're signed in before chatting."));
+            return;
+        }
+
         var messageContent = chatInput.Message.Trim();
         messages.Add(new ChatMessage("You", messageContent, DateTime.UtcNow, true));
         chatInput.Message = string.Empty;
 
-        var request = new LlmApiRequest
+        var request = new LlmChatRequest
         {
-            ChatHistory = new List<LlmChatHistory>
+            StudentId = Auth.StudentId.Value,
+            HomeworkItemId = homework.Id,
+            SessionId = chatSessionId,
+            PromptText = messageContent,
+            Request = new LlmApiRequest
             {
-                new()
+                ChatHistory = new List<LlmChatHistory>
                 {
-                    Role = "user",
-                    Content = messageContent
+                    new()
+                    {
+                        Role = "user",
+                        Content = messageContent
+                    }
                 }
             }
         };

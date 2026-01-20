@@ -20,6 +20,24 @@ public class LlmApiRequest
     public List<LlmChatHistory> ChatHistory { get; set; } = new();
 }
 
+public class LlmChatRequest
+{
+    [JsonPropertyName("studentId")]
+    public int StudentId { get; set; }
+
+    [JsonPropertyName("homeworkItemId")]
+    public int HomeworkItemId { get; set; }
+
+    [JsonPropertyName("sessionId")]
+    public string SessionId { get; set; } = string.Empty;
+
+    [JsonPropertyName("promptText")]
+    public string PromptText { get; set; } = string.Empty;
+
+    [JsonPropertyName("request")]
+    public LlmApiRequest Request { get; set; } = new();
+}
+
 public class LlmChatHistory
 {
     [JsonPropertyName("role")]
