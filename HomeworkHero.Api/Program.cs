@@ -14,6 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<HomeworkHeroContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddControllers();
+builder.Services.AddHttpClient();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -64,6 +66,7 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseCors("AllowClient");
 
+app.MapControllers();
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
