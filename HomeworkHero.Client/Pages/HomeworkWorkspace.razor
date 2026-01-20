@@ -2,6 +2,7 @@
 @page "/homework-workspace"
 @using System.ComponentModel.DataAnnotations
 @using HomeworkHero.Shared.Models
+@using Microsoft.JSInterop
 @inject HttpClient Http
 @inject AuthState Auth
 @inject IJSRuntime JS
@@ -117,7 +118,8 @@ else
     private List<Teacher> teachers = new();
     private bool isLoading = true;
     private string loadError = string.Empty;
-    private readonly string chatSessionId = Guid.NewGuid().ToString("N");
+    private const string ChatSessionStoragePrefix = "homeworkhero.chatSession";
+    private string chatSessionId = string.Empty;
 
     private List<ChatMessage> messages = new()
     {
@@ -150,6 +152,12 @@ else
             }
 
             teachers = await Http.GetFromJsonAsync<List<Teacher>>("api/teachers") ?? new();
+
+            if (Auth.StudentId.HasValue && homework is not null)
+            {
+                await EnsureChatSessionAsync();
+                await LoadChatHistoryAsync();
+            }
         }
         catch (HttpRequestException)
         {
@@ -183,6 +191,8 @@ else
         var messageContent = chatInput.Message.Trim();
         messages.Add(new ChatMessage("You", messageContent, DateTime.UtcNow, true));
         chatInput.Message = string.Empty;
+
+        await EnsureChatSessionAsync();
 
         var request = new LlmChatRequest
         {
@@ -224,6 +234,84 @@ else
         catch (HttpRequestException)
         {
             messages.Add(new ChatMessage("AI helper", "I couldn't reach the AI service. Please check your connection and try again."));
+        }
+    }
+
+    private async Task LoadChatHistoryAsync()
+    {
+        if (!Auth.StudentId.HasValue || homework is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var prompts = await Http.GetFromJsonAsync<List<StudentPromptDto>>(
+                $"api/students/{Auth.StudentId.Value}/prompts?homeworkId={homework.Id}") ?? new();
+
+            var orderedPrompts = prompts
+                .OrderBy(p => p.CreatedAt)
+                .ThenBy(p => p.Id)
+                .ToList();
+
+            messages = new List<ChatMessage>();
+
+            foreach (var prompt in orderedPrompts)
+            {
+                if (!string.IsNullOrWhiteSpace(prompt.PromptText))
+                {
+                    messages.Add(new ChatMessage("You", prompt.PromptText, prompt.CreatedAt, true));
+                }
+
+                if (!string.IsNullOrWhiteSpace(prompt.ResponseText))
+                {
+                    messages.Add(new ChatMessage("AI helper", prompt.ResponseText, prompt.CreatedAt));
+                }
+            }
+
+            if (messages.Count == 0)
+            {
+                messages.Add(new ChatMessage("AI helper", "Let me know where you need guidance and I'll do my best to help."));
+            }
+        }
+        catch (HttpRequestException)
+        {
+            messages.Add(new ChatMessage("AI helper", "I couldn't load previous chat history, but you can keep chatting below."));
+        }
+    }
+
+    private async Task EnsureChatSessionAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(chatSessionId))
+        {
+            return;
+        }
+
+        if (!Auth.StudentId.HasValue || homework is null)
+        {
+            return;
+        }
+
+        var storageKey = $"{ChatSessionStoragePrefix}.{Auth.StudentId.Value}.{homework.Id}";
+
+        try
+        {
+            var storedSession = await JS.InvokeAsync<string?>("localStorage.getItem", storageKey);
+            if (string.IsNullOrWhiteSpace(storedSession))
+            {
+                storedSession = Guid.NewGuid().ToString("N");
+                await JS.InvokeVoidAsync("localStorage.setItem", storageKey, storedSession);
+            }
+
+            chatSessionId = storedSession;
+        }
+        catch (JSException)
+        {
+            chatSessionId = Guid.NewGuid().ToString("N");
+        }
+        catch (InvalidOperationException)
+        {
+            chatSessionId = Guid.NewGuid().ToString("N");
         }
     }
 
