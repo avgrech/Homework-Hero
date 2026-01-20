@@ -1,4 +1,5 @@
 using HomeworkHero.Api.Data;
+using HomeworkHero.Api.Services;
 using HomeworkHero.Shared.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
@@ -16,6 +17,7 @@ builder.Services.AddDbContext<HomeworkHeroContext>(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
+builder.Services.AddScoped<IPromptBuilder, PromptBuilder>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -58,6 +60,18 @@ using (var scope = app.Services.CreateScope())
         };
 
         db.Users.Add(adminUser);
+        db.SaveChanges();
+    }
+
+    if (!db.Paramiters.Any(p => p.Name == "StudentBasePrompt"))
+    {
+        var basePrompt = new Paramiter
+        {
+            Name = "StudentBasePrompt",
+            Value = "Student {{StudentName}} has the following conditions: {{StudentConditions}}. Use this context to tailor the response."
+        };
+
+        db.Paramiters.Add(basePrompt);
         db.SaveChanges();
     }
 }
