@@ -1,6 +1,7 @@
 @page "/homework-workspace/{HomeworkId:int}"
 @page "/homework-workspace"
 @using System.ComponentModel.DataAnnotations
+@using HomeworkHero.Shared.Models
 @inject HttpClient Http
 @inject AuthState Auth
 
@@ -167,11 +168,44 @@ else
             return;
         }
 
-        messages.Add(new ChatMessage("You", chatInput.Message.Trim(), DateTime.UtcNow, true));
+        var messageContent = chatInput.Message.Trim();
+        messages.Add(new ChatMessage("You", messageContent, DateTime.UtcNow, true));
         chatInput.Message = string.Empty;
 
-        await Task.Delay(300); // placeholder for future AI call
-        messages.Add(new ChatMessage("AI helper", "Thanks for the update! I'll review your message when the AI connection is ready."));
+        var request = new LlmApiRequest
+        {
+            ChatHistory = new List<LlmChatHistory>
+            {
+                new()
+                {
+                    Role = "user",
+                    Content = messageContent
+                }
+            }
+        };
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/LLM_Comunication", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                messages.Add(new ChatMessage("AI helper", "I couldn't reach the AI service. Please try again in a moment."));
+                return;
+            }
+
+            var llmResponse = await response.Content.ReadFromJsonAsync<LlmApiResponse>();
+            if (llmResponse is null || !llmResponse.Success || string.IsNullOrWhiteSpace(llmResponse.AssistantResponse))
+            {
+                messages.Add(new ChatMessage("AI helper", "I didn't receive a response from the AI service."));
+                return;
+            }
+
+            messages.Add(new ChatMessage("AI helper", llmResponse.AssistantResponse));
+        }
+        catch (HttpRequestException)
+        {
+            messages.Add(new ChatMessage("AI helper", "I couldn't reach the AI service. Please check your connection and try again."));
+        }
     }
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
