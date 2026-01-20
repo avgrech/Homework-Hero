@@ -1,5 +1,5 @@
 using System.Net.Http.Json;
-using HomeworkHero.Api.Models;
+using HomeworkHero.Shared.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HomeworkHero.Api.Controllers;
@@ -18,7 +18,7 @@ public class LLM_ComunicationController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<LLM_API_Response>> SendAIRequest([FromBody] LLM_API_Request request)
+    public async Task<ActionResult<LlmApiResponse>> SendAIRequest([FromBody] LlmApiRequest request)
     {
         if (string.IsNullOrWhiteSpace(_llmApiUrl))
         {
@@ -31,7 +31,7 @@ public class LLM_ComunicationController : ControllerBase
             return StatusCode((int)response.StatusCode, "LLM API call failed.");
         }
 
-        var result = await response.Content.ReadFromJsonAsync<LLM_API_Response>();
+        var result = await response.Content.ReadFromJsonAsync<LlmApiResponse>();
         if (result is null)
         {
             return StatusCode(StatusCodes.Status502BadGateway, "Invalid response from LLM API.");
